@@ -4,7 +4,7 @@ nohup timeout 30h python main.py \
     --num_examples 64000 \
     --batch_size 16 \
     --tensor_parallel_size 2 \
-    --max_tokens 3072 \
+    --max_tokens 4096 \
     --temperature 0.9 \
     --skip 0 \
     --seed 164 \
