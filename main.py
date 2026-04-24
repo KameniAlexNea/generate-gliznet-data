@@ -14,9 +14,7 @@ Output: a JSONL file where each line is one generated example:
 Usage:
     python main.py \
         --output_path data/wikipedia_synthetic.jsonl \
-        --model Jackrong/Qwopus3.6-27B-v1-preview-GGUF \
-        --tokenizer Jackrong/Qwopus3.6-27B-v1-preview \
-        --gguf_file Qwopus3.6-27B-v1-preview-Q4_K_M.gguf \
+        --model Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled  \
         --num_examples 50000 \
         --batch_size 32 \
         --tensor_parallel_size 2 \
@@ -111,11 +109,9 @@ def _expand_bundle(bundle: dict) -> list[dict]:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate synthetic classification data from Wikipedia.")
     p.add_argument("--output_path", default="data/wikipedia_synthetic.jsonl")
-    p.add_argument("--model", default="Jackrong/Qwopus3.6-27B-v1-preview-GGUF")
-    p.add_argument("--tokenizer", default=None,
-                   help="Tokenizer repo (required for GGUF models, e.g. the non-quantized repo).")
-    p.add_argument("--gguf_file", default=None,
-                   help="GGUF filename inside the model repo (e.g. model-Q4_K_M.gguf).")
+    p.add_argument("--model", default="Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled ")
+    p.add_argument("--quantization", default=None,
+                   help="Quantization method (e.g. awq, gptq, fp8). None for full-precision.")
     p.add_argument("--num_examples", type=int, default=10000)
     p.add_argument("--batch_size", type=int, default=16,
                    help="Number of prompts per vLLM generation call.")
@@ -167,10 +163,8 @@ def main() -> None:
         model=args.model,
         tensor_parallel_size=args.tensor_parallel_size,
     )
-    if args.tokenizer:
-        llm_kwargs["tokenizer"] = args.tokenizer
-    if args.gguf_file:
-        llm_kwargs["gguf_file"] = args.gguf_file
+    if args.quantization:
+        llm_kwargs["quantization"] = args.quantization
     llm = LLM(**llm_kwargs)
     tokenizer = llm.get_tokenizer()
 
