@@ -14,11 +14,13 @@ Output: a JSONL file where each line is one generated example:
 Usage:
     python main.py \
         --output_path data/wikipedia_synthetic.jsonl \
-        --model Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled \
-        --num_examples 10000 \
-        --batch_size 16 \
+        --model Jackrong/Qwopus3.6-27B-v1-preview-GGUF \
+        --tokenizer Jackrong/Qwopus3.6-27B-v1-preview \
+        --gguf_file Qwopus3.6-27B-v1-preview-Q4_K_M.gguf \
+        --num_examples 50000 \
+        --batch_size 32 \
         --tensor_parallel_size 2 \
-        --max_tokens 4096 \
+        --max_tokens 3072 \
         --temperature 0.9 \
         --skip 0 \
         --seed 42 \
@@ -58,10 +60,6 @@ USER_TEMPLATE = (
     "<genres>\n{genres_block}\n</genres>\n\n"
     "<wikipedia_excerpt>\n{title}\n\n{text}\n</wikipedia_excerpt>"
 )
-MAX_INPUT_TOKENS = Config.MAX_INPUT_TOKENS  # Adjust based on your model's context window and expected output length
-
-EXAMPLES_PER_BUNDLE = Config.EXAMPLES_PER_BUNDLE      # Number of texts generated per LLM call
-
 
 def _build_prompt(tokenizer, title: str, text: str) -> str:
     name, desc = random.choice(TEXT_GENRES)
@@ -73,7 +71,7 @@ def _build_prompt(tokenizer, title: str, text: str) -> str:
     )
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_content[:MAX_INPUT_TOKENS]},
+        {"role": "user", "content": user_content[:Config.MAX_INPUT_TOKENS]},
     ]
     return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
@@ -113,13 +111,17 @@ def _expand_bundle(bundle: dict) -> list[dict]:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate synthetic classification data from Wikipedia.")
     p.add_argument("--output_path", default="data/wikipedia_synthetic.jsonl")
-    p.add_argument("--model", default="Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled")
+    p.add_argument("--model", default="Jackrong/Qwopus3.6-27B-v1-preview-GGUF")
+    p.add_argument("--tokenizer", default=None,
+                   help="Tokenizer repo (required for GGUF models, e.g. the non-quantized repo).")
+    p.add_argument("--gguf_file", default=None,
+                   help="GGUF filename inside the model repo (e.g. model-Q4_K_M.gguf).")
     p.add_argument("--num_examples", type=int, default=10000)
     p.add_argument("--batch_size", type=int, default=16,
                    help="Number of prompts per vLLM generation call.")
     p.add_argument("--tensor_parallel_size", type=int, default=2)
     p.add_argument("--temperature", type=float, default=0.9)
-    p.add_argument("--max_tokens", type=int, default=4096)
+    p.add_argument("--max_tokens", type=int, default=3072)
     p.add_argument("--skip", type=int, default=0,
                    help="Articles to skip after shuffle (resume support).")
     p.add_argument("--seed", type=int, default=42)
@@ -146,7 +148,7 @@ def main() -> None:
         logger.info("Target already reached. Exiting.")
         return
 
-    articles_needed = math.ceil(remaining / EXAMPLES_PER_BUNDLE)
+    articles_needed = math.ceil(remaining / Config.EXAMPLES_PER_BUNDLE)
     logger.info("Loading wikimedia/wikipedia 20231101.en (streaming, shuffled)...")
     ds = load_dataset(
         "wikimedia/wikipedia",
@@ -156,12 +158,20 @@ def main() -> None:
     ).shuffle(seed=args.seed, buffer_size=args.shuffle_buffer)
 
     # Resume: approximate articles already consumed (each bundle uses one article).
-    skip = args.skip + math.ceil(written / EXAMPLES_PER_BUNDLE)
+    skip = args.skip + math.ceil(written / Config.EXAMPLES_PER_BUNDLE)
     logger.info(f"Sampling {articles_needed} articles (skip={skip})...")
     ds_batched = ds.skip(skip).take(articles_needed).batch(args.batch_size)
 
     logger.info(f"Loading model {args.model} (tensor_parallel_size={args.tensor_parallel_size})...")
-    llm = LLM(model=args.model, tensor_parallel_size=args.tensor_parallel_size)
+    llm_kwargs = dict(
+        model=args.model,
+        tensor_parallel_size=args.tensor_parallel_size,
+    )
+    if args.tokenizer:
+        llm_kwargs["tokenizer"] = args.tokenizer
+    if args.gguf_file:
+        llm_kwargs["gguf_file"] = args.gguf_file
+    llm = LLM(**llm_kwargs)
     tokenizer = llm.get_tokenizer()
 
     sampling_params = SamplingParams(

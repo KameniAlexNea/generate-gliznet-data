@@ -1,11 +1,13 @@
 nohup timeout 20h python main.py \
     --output_path data/wikipedia_synthetic.jsonl \
-    --model Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled \
-    --num_examples 50000 \
-    --batch_size 16 \
+    --model Jackrong/Qwopus3.6-27B-v1-preview-GGUF \
+    --tokenizer Jackrong/Qwopus3.6-27B-v1-preview \
+    --gguf_file Qwopus3.6-27B-v1-preview-Q4_K_M.gguf \
+    --num_examples 64000 \
+    --batch_size 32 \
     --tensor_parallel_size 2 \
-    --max_tokens 4096 \
+    --max_tokens 3072 \
     --temperature 0.9 \
     --skip 0 \
-    --seed 42 \
+    --seed 64 \
     --shuffle_buffer 50000 &> wikipedia_synthetic.log &
