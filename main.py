@@ -83,47 +83,26 @@ def _build_prompt(tokenizer, title: str, text: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _validate_bundle(obj: dict) -> bool:
-    """Accept a bundle if every label appears in both positive and negative roles across examples."""
-    if not isinstance(obj, dict):
-        return False
-    examples = obj.get("examples", [])
-    if not isinstance(examples, list) or not examples:
-        return False
-    pos_seen: set[str] = set()
-    neg_seen: set[str] = set()
-    for ex in examples:
-        if not isinstance(ex, dict):
-            return False
-        text = ex.get("text", "")
-        labels = ex.get("labels", [])
-        not_labels = ex.get("not_labels", [])
-        if not isinstance(text, str):
-            return False
-        if not isinstance(labels, list) or not isinstance(not_labels, list):
-            return False
-        labels = [str(lab).strip() for lab in labels if str(lab).strip()]
-        not_labels = [str(lab).strip() for lab in not_labels if str(lab).strip()]
-        # Simulate per-sample overlap removal: overlapping labels are dropped from both sides
-        label_set = set(labels)
-        not_label_set = set(not_labels)
-        overlap = label_set & not_label_set
-        pos_seen.update(l for l in label_set if l not in overlap)
-        neg_seen.update(l for l in not_label_set if l not in overlap)
-    # Every label must appear in both positive and negative roles (strict cross-role)
-    return bool(pos_seen) and pos_seen == neg_seen
+    """Accept a bundle if it is a dict with a non-empty examples list."""
+    return isinstance(obj, dict) and isinstance(obj.get("examples"), list) and bool(obj["examples"])
 
 
 def _expand_bundle(bundle: dict) -> list[dict]:
-    """Expand a validated bundle into individual JSONL-ready example dicts."""
-    return [
-        {
-            "source": "wikipedia",
-            "text": ex["text"],
-            "labels": [l for l in ex["labels"] if l not in ex["not_labels"]],
-            "not_labels": [l for l in ex["not_labels"] if l not in ex["labels"]],
-        }
-        for ex in bundle["examples"]
-    ]
+    """Expand a bundle into individual JSONL-ready example dicts, skipping invalid examples."""
+    results = []
+    for ex in bundle["examples"]:
+        if not isinstance(ex, dict):
+            continue
+        text = ex.get("text", "")
+        labels = [str(lab).strip() for lab in ex.get("labels", []) if str(lab).strip()]
+        not_labels = [str(lab).strip() for lab in ex.get("not_labels", []) if str(lab).strip()]
+        intersection = set(labels) & set(not_labels)
+        labels = [lab for lab in labels if lab not in intersection]
+        not_labels = [lab for lab in not_labels if lab not in intersection]
+        if not isinstance(text, str) or not labels or not not_labels:
+            continue
+        results.append({"source": "wikipedia", "text": text, "labels": labels, "not_labels": not_labels})
+    return results
 
 
 # ---------------------------------------------------------------------------
