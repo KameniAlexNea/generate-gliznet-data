@@ -12,12 +12,17 @@ Output: a JSONL file where each line is one generated example:
     {"source": "wikipedia", "text": "...", "labels": [...], "not_labels": [...]}
 
 Usage:
-    python generate_wikipedia.py \
+    python main.py \
         --output_path data/wikipedia_synthetic.jsonl \
         --model Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled \
-        --num_examples 5000 \
+        --num_examples 10000 \
         --batch_size 16 \
-        --tensor_parallel_size 2
+        --tensor_parallel_size 2 \
+        --max_tokens 4096 \
+        --temperature 0.9 \
+        --skip 0 \
+        --seed 42 \
+        --shuffle_buffer 50000
 
 Requirements:
     pip install vllm datasets tqdm
@@ -50,7 +55,7 @@ logger = logging.getLogger(__name__)
 
 
 USER_TEMPLATE = (
-    "<genres>\n{genres_block}</genres>\n\n"
+    "<genres>\n{genres_block}\n</genres>\n\n"
     "<wikipedia_excerpt>\n{title}\n\n{text}\n</wikipedia_excerpt>"
 )
 MAX_INPUT_TOKENS = Config.MAX_INPUT_TOKENS  # Adjust based on your model's context window and expected output length
@@ -96,8 +101,8 @@ def _validate_bundle(obj: dict) -> bool:
             return False
         if not isinstance(labels, list) or not isinstance(not_labels, list):
             return False
-        if not all(isinstance(lab, str) for lab in labels + not_labels):
-            return False
+        labels = [str(lab).strip() for lab in labels if str(lab).strip()]
+        not_labels = [str(lab).strip() for lab in not_labels if str(lab).strip()]
         # Simulate per-sample overlap removal: overlapping labels are dropped from both sides
         label_set = set(labels)
         not_label_set = set(not_labels)
@@ -174,15 +179,7 @@ def main() -> None:
     # Resume: approximate articles already consumed (each bundle uses one article).
     skip = args.skip + math.ceil(written / EXAMPLES_PER_BUNDLE)
     logger.info(f"Sampling {articles_needed} articles (skip={skip})...")
-    articles: list[tuple[str, str]] = []
-    for row in ds:
-        if skip > 0:
-            skip -= 1
-            continue
-        articles.append((row["title"], row["text"]))
-        if len(articles) >= articles_needed:
-            break
-    logger.info(f"Collected {len(articles)} articles → up to {len(articles) * EXAMPLES_PER_BUNDLE} examples.")
+    ds_batched = ds.skip(skip).take(articles_needed).batch(args.batch_size)
 
     logger.info(f"Loading model {args.model} (tensor_parallel_size={args.tensor_parallel_size})...")
     llm = LLM(model=args.model, tensor_parallel_size=args.tensor_parallel_size)
@@ -198,10 +195,10 @@ def main() -> None:
     success = 0
     failure = 0
 
-    with open(output_path, "a") as out_file:
-        for batch_start in tqdm(range(0, len(articles), args.batch_size), desc="Batches"):
-            batch = articles[batch_start : batch_start + args.batch_size]
-            prompts = [_build_prompt(tokenizer, title, text) for title, text in batch]
+    num_batches = math.ceil(articles_needed / args.batch_size)
+    with open(output_path, "a", encoding="utf-8") as out_file:
+        for batch in tqdm(ds_batched, total=num_batches, desc="Batches"):
+            prompts = [_build_prompt(tokenizer, title, text) for title, text in zip(batch["title"], batch["text"])]
 
             outputs = llm.generate(prompts, sampling_params)
 
@@ -209,7 +206,7 @@ def main() -> None:
                 content = output.outputs[0].text
                 try:
                     bundle = parse_json(content)
-                except (ValueError, Exception):
+                except Exception:
                     bundle = None
                 if bundle and _validate_bundle(bundle):
                     for example in _expand_bundle(bundle):
