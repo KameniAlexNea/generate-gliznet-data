@@ -1,0 +1,12 @@
+[project]
+name = "generate-gliznet-data"
+version = "0.1.0"
+description = "Generate GlizNet synthetic dataset for Zero Shot Classification"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "datasets>=4.8.4",
+    "llm-output-parser>=0.3.0",
+    "tqdm>=4.67.3",
+    "vllm>=0.19.1",
+]
