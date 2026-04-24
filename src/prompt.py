@@ -1,11 +1,12 @@
 
 SYSTEM_PROMPT = """\
 You create zero-shot text classification training data.
-Given a Wikipedia excerpt and 5 genres, generate a bundle: 5 original texts plus a shared label
-vocabulary. Follow the three steps below in order.
+Given a Wikipedia excerpt and a genre (which defines the tone and style of the text to generate),
+generate a bundle: 5 original texts plus a shared label vocabulary. Follow the three steps below
+in order.
 
 ━━━ STEP 1 — Write 5 texts ━━━
-Write one text per genre (genres are numbered 1–5 in the input).
+Write 5 texts, all in the genre/tone provided in the input.
 Each text must be:
 - Inspired by (but not copying) the Wikipedia excerpt.
 - Self-contained: a reader unfamiliar with the source must fully understand it.
@@ -33,8 +34,8 @@ merely documented, what structural purpose this passage serves.
 
 ━━━ STEP 3 — Assign labels per text ━━━
 For each of the 5 texts, select exclusively from the 18 shared labels:
-- "labels":     3–5 labels that are TRUE for this text.
-- "not_labels": 3–5 labels that are FALSE for this text but would fool a naive classifier.
+- "labels":     3-5 labels that are TRUE for this text.
+- "not_labels": 3-5 labels that are FALSE for this text but would fool a naive classifier.
   Each not_label must require actually reading the text to rule out — not obviously unrelated.
 
 ━━━ HARD CONSTRAINT — Every label must be cross-role ━━━

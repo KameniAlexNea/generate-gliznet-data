@@ -2,8 +2,8 @@
 """
 Wikipedia synthetic data generator using vLLM.
 
-Streams the wikimedia/wikipedia 20231101.en subset, picks a random paragraph
-from each article, and uses a local LLM via vLLM to produce:
+Streams the wikimedia/wikipedia 20231101.en subset, passes the full article
+text to a local LLM via vLLM to produce:
   - An original text INSPIRED by that paragraph.
   - A list of non-trivial `labels`     (what the text IS about).
   - A list of non-trivial `not_labels` (plausible-sounding but wrong labels).
@@ -59,10 +59,8 @@ EXAMPLES_PER_BUNDLE = Config.EXAMPLES_PER_BUNDLE      # Number of texts generate
 
 
 def _build_prompt(tokenizer, title: str, text: str) -> str:
-    genres = random.sample(TEXT_GENRES, EXAMPLES_PER_BUNDLE)
-    genres_block = "\n".join(
-        f"{i + 1}. {name}: {desc}" for i, (name, desc) in enumerate(genres)
-    )
+    name, desc = random.choice(TEXT_GENRES)
+    genres_block = f"{name}: {desc}"
     user_content = USER_TEMPLATE.format(
         genres_block=genres_block + "\n",
         title=title,
@@ -80,16 +78,12 @@ def _build_prompt(tokenizer, title: str, text: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _validate_bundle(obj: dict) -> bool:
-    """Accept a bundle if it has valid structure and ≥50% of shared labels are cross-role."""
+    """Accept a bundle if every label appears in both positive and negative roles across examples."""
     if not isinstance(obj, dict):
         return False
-    shared = obj.get("shared_labels", [])
     examples = obj.get("examples", [])
-    if not isinstance(shared, list) or len(shared) < 6:
+    if not isinstance(examples, list) or not examples:
         return False
-    if not isinstance(examples, list) or len(examples) < 2:
-        return False
-    shared_set = set(shared)
     pos_seen: set[str] = set()
     neg_seen: set[str] = set()
     for ex in examples:
@@ -98,18 +92,20 @@ def _validate_bundle(obj: dict) -> bool:
         text = ex.get("text", "")
         labels = ex.get("labels", [])
         not_labels = ex.get("not_labels", [])
-        if not isinstance(text, str) or len(text) < Config.MIN_TEXT_LENGTH:
+        if not isinstance(text, str):
             return False
-        if not isinstance(labels, list) or len(labels) < Config.MIN_NUM_LABELS:
-            return False
-        if not isinstance(not_labels, list) or len(not_labels) < Config.MIN_NUM_LABELS:
+        if not isinstance(labels, list) or not isinstance(not_labels, list):
             return False
         if not all(isinstance(lab, str) for lab in labels + not_labels):
             return False
-        pos_seen.update(labels)
-        neg_seen.update(not_labels)
-    cross_role = pos_seen & neg_seen
-    return len(cross_role) >= max(1, len(shared_set) * 0.5)
+        # Simulate per-sample overlap removal: overlapping labels are dropped from both sides
+        label_set = set(labels)
+        not_label_set = set(not_labels)
+        overlap = label_set & not_label_set
+        pos_seen.update(l for l in label_set if l not in overlap)
+        neg_seen.update(l for l in not_label_set if l not in overlap)
+    # Every label must appear in both positive and negative roles (strict cross-role)
+    return bool(pos_seen) and pos_seen == neg_seen
 
 
 def _expand_bundle(bundle: dict) -> list[dict]:
@@ -118,8 +114,8 @@ def _expand_bundle(bundle: dict) -> list[dict]:
         {
             "source": "wikipedia",
             "text": ex["text"],
-            "labels": ex["labels"],
-            "not_labels": ex["not_labels"],
+            "labels": [l for l in ex["labels"] if l not in ex["not_labels"]],
+            "not_labels": [l for l in ex["not_labels"] if l not in ex["labels"]],
         }
         for ex in bundle["examples"]
     ]
@@ -133,8 +129,8 @@ def _expand_bundle(bundle: dict) -> list[dict]:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate synthetic classification data from Wikipedia.")
     p.add_argument("--output_path", default="data/wikipedia_synthetic.jsonl")
-    p.add_argument("--model", default="Qwen/Qwen2.5-72B-Instruct")
-    p.add_argument("--num_examples", type=int, default=5000)
+    p.add_argument("--model", default="Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled")
+    p.add_argument("--num_examples", type=int, default=10000)
     p.add_argument("--batch_size", type=int, default=16,
                    help="Number of prompts per vLLM generation call.")
     p.add_argument("--tensor_parallel_size", type=int, default=2)
@@ -195,6 +191,8 @@ def main() -> None:
     sampling_params = SamplingParams(
         temperature=args.temperature,
         max_tokens=args.max_tokens,
+        top_p=0.95,
+        top_k=64,
     )
 
     success = 0
