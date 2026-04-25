@@ -1,33 +1,3 @@
-#!/usr/bin/env python3
-"""
-Wikipedia synthetic data generator using vLLM.
-
-Streams the wikimedia/wikipedia 20231101.en subset, passes the full article
-text to a local LLM via vLLM to produce:
-  - An original text INSPIRED by that paragraph.
-  - A list of non-trivial `labels`     (what the text IS about).
-  - A list of non-trivial `not_labels` (plausible-sounding but wrong labels).
-
-Output: a JSONL file where each line is one generated example:
-    {"source": "wikipedia", "text": "...", "labels": [...], "not_labels": [...]}
-
-Usage:
-    python main.py \
-        --output_path data/wikipedia_synthetic.jsonl \
-        --model Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled  \
-        --num_examples 50000 \
-        --batch_size 32 \
-        --tensor_parallel_size 2 \
-        --max_tokens 3072 \
-        --temperature 0.9 \
-        --skip 0 \
-        --seed 42 \
-        --shuffle_buffer 50000
-
-Requirements:
-    pip install vllm datasets tqdm
-"""
-
 import argparse
 import json
 import logging
@@ -53,11 +23,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-
 USER_TEMPLATE = (
     "<genres>\n{genres_block}\n</genres>\n\n"
     "<wikipedia_excerpt>\n{title}\n\n{text}\n</wikipedia_excerpt>"
 )
+
 
 def _build_prompt(tokenizer, title: str, text: str) -> str:
     name, desc = random.choice(TEXT_GENRES)
@@ -69,18 +39,25 @@ def _build_prompt(tokenizer, title: str, text: str) -> str:
     )
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_content[:Config.MAX_INPUT_TOKENS]},
+        {"role": "user", "content": user_content[: Config.MAX_INPUT_TOKENS]},
     ]
-    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    return tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _validate_bundle(obj: dict) -> bool:
     """Accept a bundle if it is a dict with a non-empty examples list."""
-    return isinstance(obj, dict) and isinstance(obj.get("examples"), list) and bool(obj["examples"])
+    return (
+        isinstance(obj, dict)
+        and isinstance(obj.get("examples"), list)
+        and bool(obj["examples"])
+    )
 
 
 def _expand_bundle(bundle: dict) -> list[dict]:
@@ -91,13 +68,22 @@ def _expand_bundle(bundle: dict) -> list[dict]:
             continue
         text = ex.get("text", "")
         labels = [str(lab).strip() for lab in ex.get("labels", []) if str(lab).strip()]
-        not_labels = [str(lab).strip() for lab in ex.get("not_labels", []) if str(lab).strip()]
+        not_labels = [
+            str(lab).strip() for lab in ex.get("not_labels", []) if str(lab).strip()
+        ]
         intersection = set(labels) & set(not_labels)
         labels = [lab for lab in labels if lab not in intersection]
         not_labels = [lab for lab in not_labels if lab not in intersection]
         if not isinstance(text, str) or not labels or not not_labels:
             continue
-        results.append({"source": "wikipedia", "text": text, "labels": labels, "not_labels": not_labels})
+        results.append(
+            {
+                "source": "wikipedia",
+                "text": text,
+                "labels": labels,
+                "not_labels": not_labels,
+            }
+        )
     return results
 
 
@@ -107,22 +93,41 @@ def _expand_bundle(bundle: dict) -> list[dict]:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Generate synthetic classification data from Wikipedia.")
+    p = argparse.ArgumentParser(
+        description="Generate synthetic classification data from Wikipedia."
+    )
     p.add_argument("--output_path", default="data/wikipedia_synthetic.jsonl")
-    p.add_argument("--model", default="Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled ")
-    p.add_argument("--quantization", default=None,
-                   help="Quantization method (e.g. awq, gptq, fp8). None for full-precision.")
+    p.add_argument(
+        "--model", default="Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled "
+    )
+    p.add_argument(
+        "--quantization",
+        default=None,
+        help="Quantization method (e.g. awq, gptq, fp8). None for full-precision.",
+    )
     p.add_argument("--num_examples", type=int, default=10000)
-    p.add_argument("--batch_size", type=int, default=16,
-                   help="Number of prompts per vLLM generation call.")
+    p.add_argument(
+        "--batch_size",
+        type=int,
+        default=16,
+        help="Number of prompts per vLLM generation call.",
+    )
     p.add_argument("--tensor_parallel_size", type=int, default=2)
     p.add_argument("--temperature", type=float, default=0.9)
     p.add_argument("--max_tokens", type=int, default=3072)
-    p.add_argument("--skip", type=int, default=0,
-                   help="Articles to skip after shuffle (resume support).")
+    p.add_argument(
+        "--skip",
+        type=int,
+        default=0,
+        help="Articles to skip after shuffle (resume support).",
+    )
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--shuffle_buffer", type=int, default=50_000,
-                   help="Buffer size for streaming shuffle.")
+    p.add_argument(
+        "--shuffle_buffer",
+        type=int,
+        default=50_000,
+        help="Buffer size for streaming shuffle.",
+    )
     return p.parse_args()
 
 
@@ -158,7 +163,9 @@ def main() -> None:
     logger.info(f"Sampling {articles_needed} articles (skip={skip})...")
     ds_batched = ds.skip(skip).take(articles_needed).batch(args.batch_size)
 
-    logger.info(f"Loading model {args.model} (tensor_parallel_size={args.tensor_parallel_size})...")
+    logger.info(
+        f"Loading model {args.model} (tensor_parallel_size={args.tensor_parallel_size})..."
+    )
     llm_kwargs = dict(
         model=args.model,
         tensor_parallel_size=args.tensor_parallel_size,
@@ -181,7 +188,10 @@ def main() -> None:
     num_batches = math.ceil(articles_needed / args.batch_size)
     with open(output_path, "a", encoding="utf-8") as out_file:
         for batch in tqdm(ds_batched, total=num_batches, desc="Batches"):
-            prompts = [_build_prompt(tokenizer, title, text) for title, text in zip(batch["title"], batch["text"])]
+            prompts = [
+                _build_prompt(tokenizer, title, text)
+                for title, text in zip(batch["title"], batch["text"])
+            ]
 
             outputs = llm.generate(prompts, sampling_params)
 
@@ -200,10 +210,11 @@ def main() -> None:
 
         out_file.flush()
 
-    logger.info(f"Done. success={success}, failure={failure}, total_written={written + success}")
+    logger.info(
+        f"Done. success={success}, failure={failure}, total_written={written + success}"
+    )
     logger.info(f"Output: {output_path}")
 
 
 if __name__ == "__main__":
     main()
-
