@@ -1,0 +1,15 @@
+[project]
+name = "generate-gliznet-data"
+version = "0.1.0"
+description = "ZSHOT-HARDSET-v2: a hard-negative zero-shot text classification benchmark"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "datasets>=4.8.4",
+    "ipywidgets>=8.1.8",
+    "jupyter>=1.1.1",
+    "llm-output-parser>=0.3.0",
+    "matplotlib>=3.10.9",
+    "tqdm>=4.67.3",
+    "vllm>=0.19.1",
+]
