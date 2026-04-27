@@ -6,6 +6,6 @@ nohup timeout 30h python main.py \
     --batch_size 16 \
     --max_tokens 4096 \
     --temperature 0.9 \
-    --skip 15000 \
+    --skip 15300 \
     --seed 164 \
     --shuffle_buffer 50000 &> wikipedia_synthetic.log &

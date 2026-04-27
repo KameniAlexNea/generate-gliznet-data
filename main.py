@@ -73,6 +73,64 @@ async def _call_api(
             return None
 
 
+async def _feed_queue(
+    ds_iter,
+    queue: asyncio.Queue,
+    articles_needed: int,
+    num_workers: int,
+) -> None:
+    loop = asyncio.get_running_loop()
+    it = iter(ds_iter)
+    count = 0
+    while count < articles_needed:
+        item = await loop.run_in_executor(None, next, it, None)
+        if item is None:
+            break
+        await queue.put((item["title"], item["text"]))
+        count += 1
+    for _ in range(num_workers):
+        await queue.put(None)
+
+
+async def _worker(
+    queue: asyncio.Queue,
+    out_file,
+    lock: asyncio.Lock,
+    client: AsyncOpenAI,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    counters: dict,
+    pbar,
+) -> None:
+    while True:
+        item = await queue.get()
+        if item is None:
+            queue.task_done()
+            break
+        title, text = item
+        content = await _call_api(
+            client, _build_messages(title, text), model, temperature, max_tokens
+        )
+        if content is None:
+            counters["failure"] += 1
+        else:
+            try:
+                bundle = parse_json(content)
+            except Exception:
+                bundle = None
+            if bundle and _validate_bundle(bundle):
+                async with lock:
+                    for example in _expand_bundle(bundle):
+                        out_file.write(json.dumps(example, ensure_ascii=False) + "\n")
+                        counters["success"] += 1
+                    out_file.flush()
+            else:
+                counters["failure"] += 1
+        pbar.update(1)
+        queue.task_done()
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -187,7 +245,7 @@ async def main() -> None:
     # Resume: approximate articles already consumed (each bundle uses one article).
     skip = args.skip + math.ceil(written / Config.EXAMPLES_PER_BUNDLE)
     logger.info(f"Sampling {articles_needed} articles (skip={skip})...")
-    ds_batched = ds.skip(skip).take(articles_needed).batch(args.batch_size)
+    ds_iter = ds.skip(skip).take(articles_needed)
 
     health_url = args.api_base.rstrip("/").removesuffix("/v1") + "/health"
     logger.info(f"Waiting for vLLM server at {health_url} ...")
@@ -205,43 +263,28 @@ async def main() -> None:
 
     client = AsyncOpenAI(base_url=args.api_base, api_key="EMPTY", max_retries=0)
 
-    success = 0
-    failure = 0
+    counters = {"success": 0, "failure": 0}
+    queue: asyncio.Queue = asyncio.Queue(maxsize=args.batch_size * 2)
+    lock = asyncio.Lock()
 
-    num_batches = math.ceil(articles_needed / args.batch_size)
     with open(output_path, "a", encoding="utf-8") as out_file:
-        for batch in tqdm(ds_batched, total=num_batches, desc="Batches"):
-            batch_messages = [
-                _build_messages(title, text)
-                for title, text in zip(batch["title"], batch["text"])
+        with tqdm(total=articles_needed, desc="Articles") as pbar:
+            worker_tasks = [
+                asyncio.create_task(
+                    _worker(
+                        queue, out_file, lock, client,
+                        args.model, args.temperature, args.max_tokens,
+                        counters, pbar,
+                    )
+                )
+                for _ in range(args.batch_size)
             ]
-
-            contents = await asyncio.gather(
-                *[
-                    _call_api(client, msgs, args.model, args.temperature, args.max_tokens)
-                    for msgs in batch_messages
-                ]
-            )
-
-            for content in contents:
-                if content is None:
-                    failure += 1
-                    continue
-                try:
-                    bundle = parse_json(content)
-                except Exception:
-                    bundle = None
-                if bundle and _validate_bundle(bundle):
-                    for example in _expand_bundle(bundle):
-                        out_file.write(json.dumps(example, ensure_ascii=False) + "\n")
-                        success += 1
-                else:
-                    failure += 1
-
-            out_file.flush()
+            await _feed_queue(ds_iter, queue, articles_needed, args.batch_size)
+            await asyncio.gather(*worker_tasks)
 
     logger.info(
-        f"Done. success={success}, failure={failure}, total_written={written + success}"
+        f"Done. success={counters['success']}, failure={counters['failure']}, "
+        f"total_written={written + counters['success']}"
     )
     logger.info(f"Output: {output_path}")
 
