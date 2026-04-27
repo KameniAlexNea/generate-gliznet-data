@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import json
 import logging
 import math
@@ -8,8 +9,9 @@ from pathlib import Path
 
 from datasets import load_dataset
 from llm_output_parser import parse_json
+import httpx
+from openai import AsyncOpenAI, APIConnectionError, APIError, APITimeoutError
 from tqdm import tqdm
-from vllm import LLM, SamplingParams
 
 from src.genres import TEXT_GENRES
 from src.prompt import SYSTEM_PROMPT
@@ -29,7 +31,7 @@ USER_TEMPLATE = (
 )
 
 
-def _build_prompt(tokenizer, title: str, text: str) -> str:
+def _build_messages(title: str, text: str) -> list:
     name, desc = random.choice(TEXT_GENRES)
     genres_block = f"{name}: {desc}"
     user_content = USER_TEMPLATE.format(
@@ -37,13 +39,38 @@ def _build_prompt(tokenizer, title: str, text: str) -> str:
         title=title,
         text=text,
     )
-    messages = [
+    return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_content[: Config.MAX_INPUT_TOKENS]},
     ]
-    return tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
+
+
+async def _call_api(
+    client: AsyncOpenAI,
+    messages: list,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+) -> str | None:
+    for attempt in range(5):
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=0.95,
+                extra_body={"top_k": 64},
+            )
+            return response.choices[0].message.content
+        except (APIError, APITimeoutError, APIConnectionError) as exc:
+            if attempt == 4:
+                logger.warning("API call failed after 5 attempts: %s", exc)
+                return None
+            await asyncio.sleep(2**attempt)
+        except Exception as exc:
+            logger.warning("Unexpected API error: %s", exc)
+            return None
 
 
 # ---------------------------------------------------------------------------
@@ -101,18 +128,17 @@ def parse_args() -> argparse.Namespace:
         "--model", default="Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled "
     )
     p.add_argument(
-        "--quantization",
-        default=None,
-        help="Quantization method (e.g. awq, gptq, fp8). None for full-precision.",
+        "--api_base",
+        default="http://localhost:8000/v1",
+        help="Base URL of the vLLM OpenAI-compatible server.",
     )
     p.add_argument("--num_examples", type=int, default=10000)
     p.add_argument(
         "--batch_size",
         type=int,
         default=16,
-        help="Number of prompts per vLLM generation call.",
+        help="Number of concurrent API requests per batch.",
     )
-    p.add_argument("--tensor_parallel_size", type=int, default=2)
     p.add_argument("--temperature", type=float, default=0.9)
     p.add_argument("--max_tokens", type=int, default=3072)
     p.add_argument(
@@ -131,7 +157,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def main() -> None:
+async def main() -> None:
     args = parse_args()
 
     output_path = Path(args.output_path)
@@ -163,24 +189,21 @@ def main() -> None:
     logger.info(f"Sampling {articles_needed} articles (skip={skip})...")
     ds_batched = ds.skip(skip).take(articles_needed).batch(args.batch_size)
 
-    logger.info(
-        f"Loading model {args.model} (tensor_parallel_size={args.tensor_parallel_size})..."
-    )
-    llm_kwargs = dict(
-        model=args.model,
-        tensor_parallel_size=args.tensor_parallel_size,
-    )
-    if args.quantization:
-        llm_kwargs["quantization"] = args.quantization
-    llm = LLM(**llm_kwargs)
-    tokenizer = llm.get_tokenizer()
+    health_url = args.api_base.rstrip("/").removesuffix("/v1") + "/health"
+    logger.info(f"Waiting for vLLM server at {health_url} ...")
+    async with httpx.AsyncClient() as hc:
+        while True:
+            try:
+                r = await hc.get(health_url, timeout=5.0)
+                if r.status_code == 200:
+                    break
+            except Exception:
+                pass
+            logger.info("Server not ready, retrying in 5 s...")
+            await asyncio.sleep(5)
+    logger.info("Server is up.")
 
-    sampling_params = SamplingParams(
-        temperature=args.temperature,
-        max_tokens=args.max_tokens,
-        top_p=0.95,
-        top_k=64,
-    )
+    client = AsyncOpenAI(base_url=args.api_base, api_key="EMPTY", max_retries=0)
 
     success = 0
     failure = 0
@@ -188,15 +211,22 @@ def main() -> None:
     num_batches = math.ceil(articles_needed / args.batch_size)
     with open(output_path, "a", encoding="utf-8") as out_file:
         for batch in tqdm(ds_batched, total=num_batches, desc="Batches"):
-            prompts = [
-                _build_prompt(tokenizer, title, text)
+            batch_messages = [
+                _build_messages(title, text)
                 for title, text in zip(batch["title"], batch["text"])
             ]
 
-            outputs = llm.generate(prompts, sampling_params)
+            contents = await asyncio.gather(
+                *[
+                    _call_api(client, msgs, args.model, args.temperature, args.max_tokens)
+                    for msgs in batch_messages
+                ]
+            )
 
-            for output in outputs:
-                content = output.outputs[0].text
+            for content in contents:
+                if content is None:
+                    failure += 1
+                    continue
                 try:
                     bundle = parse_json(content)
                 except Exception:
@@ -208,7 +238,7 @@ def main() -> None:
                 else:
                     failure += 1
 
-        out_file.flush()
+            out_file.flush()
 
     logger.info(
         f"Done. success={success}, failure={failure}, total_written={written + success}"
@@ -217,4 +247,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
