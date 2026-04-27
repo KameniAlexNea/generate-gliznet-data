@@ -1,4 +1,4 @@
-nohup timeout 30h python main.py \
+nohup timeout 5h python main.py \
     --output_path data/wikipedia_synthetic.jsonl \
     --model Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled \
     --api_base http://localhost:8000/v1 \
@@ -9,3 +9,4 @@ nohup timeout 30h python main.py \
     --skip 15300 \
     --seed 164 \
     --shuffle_buffer 50000 &> wikipedia_synthetic.log &
+echo "ds-gen PID: $!"

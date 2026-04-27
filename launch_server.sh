@@ -4,9 +4,10 @@
 
 MODEL="Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled"
 
-vllm serve "$MODEL" \
+nohup timeout 6h vllm serve "$MODEL" \
     --tensor-parallel-size 2 \
     --port 8000 \
-    --max-model-len 16384 \
+    --max-model-len 8192 \
     --dtype bfloat16 \
-    --enable-prefix-caching
+    --enable-prefix-caching &> vllm_serve.log &
+echo "vllm PID: $!"
