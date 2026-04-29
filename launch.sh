@@ -6,7 +6,7 @@ nohup timeout 5h python main.py \
     --batch_size 16 \
     --max_tokens 4096 \
     --temperature 0.9 \
-    --skip 15300 \
+    --skip 17500 \
     --seed 164 \
     --shuffle_buffer 50000 &> wikipedia_synthetic.log &
 echo "ds-gen PID: $!"
