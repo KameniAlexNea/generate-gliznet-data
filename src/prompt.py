@@ -16,6 +16,13 @@ Each text must be:
 
 ━━━ SPECIAL RULE — MCQ genres (any genre whose name contains "MCQ") ━━━
 When the genre is an MCQ genre, the format is COMPLETELY DIFFERENT from the standard format above.
+
+CORE RULE — inference over retrieval: The correct answer must NEVER appear verbatim or
+near-verbatim in the context. Every answer must be inferred, computed, or derived from what
+the context implies. A question whose answer can be found by scanning the context for a
+matching string is INVALID — the context should make the answer deducible, not readable.
+This applies to ALL MCQ genres: history, geography, literature, trivia, and all others.
+
 Each of the 5 "texts" is a question-answering item with this exact structure:
 
   text       : A SHORT CONTEXT (2–4 sentences of domain-relevant background drawn from the
