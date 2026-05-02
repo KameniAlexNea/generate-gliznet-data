@@ -2,6 +2,24 @@
 # Each entry: (genre_name, brief_description_for_the_model)
 # All genres are applied to a Wikipedia excerpt provided as context.
 # The model must write texts INSPIRED BY (not copying) that excerpt, in the register below.
+
+# (label, instruction passed to the model)
+TEXT_LENGTHS = [
+    ("very short",  "Each text must be exactly 1 sentence — dense and self-contained."),
+    ("short",       "Each text must be 1–2 sentences."),
+    ("medium",      "Each text must be 2–3 sentences."),
+    ("long",        "Each text must be 3–5 sentences forming a coherent, developed paragraph."),
+    ("very long",   "Each text must be 5–8 sentences: a fully developed paragraph with context, development, and a closing point."),
+]
+
+# (label, instruction passed to the model)
+LANGUAGE_LEVELS = [
+    ("A2",  "Use very simple English: short sentences, common everyday words only, no jargon or complex grammar. Suitable for beginners."),
+    ("B1",  "Use plain, clear English: straightforward sentences, familiar vocabulary, minimal technical terms. Suitable for intermediate speakers."),
+    ("B2",  "Use standard educated English: varied sentence structure, some domain vocabulary, clear but not simplified."),
+    ("C1",  "Use sophisticated English: complex sentence structures, precise vocabulary, idiomatic expressions, domain-specific register."),
+    ("C2",  "Use highly sophisticated English: nuanced, dense prose, advanced register, rhetorical complexity — as in published academic or literary writing."),
+]
 TEXT_GENRES = [
     # ── Reference / Encyclopedic ─────────────────────────────────────────────
     ("encyclopedia entry",         "A reworked neutral third-person encyclopedic paragraph about the Wikipedia topic, as it might appear in a different reference work — factual, structured, no original analysis. Do NOT copy the source verbatim; rephrase, reorganise, and compress."),

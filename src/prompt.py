@@ -6,12 +6,12 @@ Given a Wikipedia excerpt and a genre that defines the tone and style, generate 
 
 STEP 1 — Write 5 texts
 
-Write 5 texts in the provided genre/tone. Each text must be:
+Write 5 texts in the provided genre/tone, at the specified length and language level. Each text must be:
 - Inspired by, but not copying, the Wikipedia excerpt.
 - Self-contained so a reader unfamiliar with the source fully understands it.
 - A complete thought; never start with a bare number or a mid-sentence fragment.
 - For listicle or instruction genres, framed so the item stands alone.
-- Either 2–3 sentences or 1 detail-rich sentence.
+- The length and language level specified in the input must be respected across all 5 texts.
 
 STEP 2 — Define exactly 15 shared semantic labels
 

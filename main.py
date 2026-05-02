@@ -13,7 +13,7 @@ import httpx
 from openai import AsyncOpenAI, APIConnectionError, APIError, APITimeoutError
 from tqdm import tqdm
 
-from src.genres import TEXT_GENRES
+from src.genres import TEXT_GENRES, TEXT_LENGTHS, LANGUAGE_LEVELS
 from src.prompt import SYSTEM_PROMPT
 from src.config import Config
 
@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 
 
 USER_TEMPLATE = (
-    "<genres>\n{genres_block}\n</genres>\n\n"
+    "<genre>\n{genres_block}\n</genre>\n\n"
+    "<length>{length_label}: {length_instruction}</length>\n\n"
+    "<language_level>{level_label}: {level_instruction}</language_level>\n\n"
     "<wikipedia_excerpt>\n{title}\n\n{text}\n</wikipedia_excerpt>"
 )
 
@@ -34,8 +36,14 @@ USER_TEMPLATE = (
 def _build_messages(title: str, text: str) -> list:
     name, desc = random.choice(TEXT_GENRES)
     genres_block = f"{name}: {desc}"
+    length_label, length_instruction = random.choice(TEXT_LENGTHS)
+    level_label, level_instruction = random.choice(LANGUAGE_LEVELS)
     user_content = USER_TEMPLATE.format(
         genres_block=genres_block + "\n",
+        length_label=length_label,
+        length_instruction=length_instruction,
+        level_label=level_label,
+        level_instruction=level_instruction,
         title=title,
         text=text,
     )

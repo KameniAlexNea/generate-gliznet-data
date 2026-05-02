@@ -4,7 +4,7 @@
 
 MODEL="Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled"
 
-nohup timeout 11h vllm serve "$MODEL" \
+nohup timeout 16h vllm serve "$MODEL" \
     --tensor-parallel-size 2 \
     --port 8000 \
     --max-model-len 8192 \
