@@ -2,6 +2,24 @@
 # Each entry: (genre_name, brief_description_for_the_model)
 # All genres are applied to a Wikipedia excerpt provided as context.
 # The model must write texts INSPIRED BY (not copying) that excerpt, in the register below.
+
+# (label, instruction passed to the model)
+TEXT_LENGTHS = [
+    ("very short",  "Each text must be exactly 1 sentence — dense and self-contained."),
+    ("short",       "Each text must be 1–2 sentences."),
+    ("medium",      "Each text must be 2–3 sentences."),
+    ("long",        "Each text must be 3–5 sentences forming a coherent, developed paragraph."),
+    ("very long",   "Each text must be 5–8 sentences: a fully developed paragraph with context, development, and a closing point."),
+]
+
+# (label, instruction passed to the model)
+LANGUAGE_LEVELS = [
+    ("A2",  "Use very simple English: short sentences, common everyday words only, no jargon or complex grammar. Suitable for beginners."),
+    ("B1",  "Use plain, clear English: straightforward sentences, familiar vocabulary, minimal technical terms. Suitable for intermediate speakers."),
+    ("B2",  "Use standard educated English: varied sentence structure, some domain vocabulary, clear but not simplified."),
+    ("C1",  "Use sophisticated English: complex sentence structures, precise vocabulary, idiomatic expressions, domain-specific register."),
+    ("C2",  "Use highly sophisticated English: nuanced, dense prose, advanced register, rhetorical complexity — as in published academic or literary writing."),
+]
 TEXT_GENRES = [
     # ── Reference / Encyclopedic ─────────────────────────────────────────────
     ("encyclopedia entry",         "A reworked neutral third-person encyclopedic paragraph about the Wikipedia topic, as it might appear in a different reference work — factual, structured, no original analysis. Do NOT copy the source verbatim; rephrase, reorganise, and compress."),
@@ -15,6 +33,7 @@ TEXT_GENRES = [
     ("tabloid headline or lede",   "Sensational tabloid prose about the Wikipedia topic: punchy verbs, hyperbole, celebrity or scandal framing even for dry subjects — breathless register."),
     ("op-ed / opinion column",     "A strong personal argument about the Wikipedia topic in a newspaper opinion piece: direct, polemical, first-person authority."),
     ("sports commentary",          "Energetic commentary covering the Wikipedia topic as if it were a live or recent sporting event: competitive stakes, dramatic moments, statistics — any topic can be framed as a contest or championship."),
+    ("letter to the editor",       "A reader's letter submitted to a newspaper or magazine about the Wikipedia topic: opinionated, concise, addressed to the publication, appeals to civic or community concern — distinct from an op-ed in its brevity and reader-voice register."),
 
     # ── Academic / Scientific ────────────────────────────────────────────────
     ("empirical paper finding",    "A single key result or finding as it would appear in a scientific paper about the Wikipedia topic: specific, data-grounded, past-tense, with implied methodology."),
@@ -22,6 +41,7 @@ TEXT_GENRES = [
     ("peer review comment",        "A referee-style critique treating the Wikipedia topic as the subject of an academic manuscript: constructive but critical, hedged with 'appears' or 'seems', numbered concerns, formal register."),
     ("grant proposal excerpt",     "An academic or NGO funding application whose project addresses the Wikipedia topic: formal, objective-driven, evidence-cited, future-tense."),
     ("ethnographic field note",    "An observer's field note about the Wikipedia topic treated as a social or cultural phenomenon under study: present-tense, etic perspective, thick description, analytical detachment."),
+    ("academic lecture transcript", "A lightly edited excerpt from a spoken university lecture on the Wikipedia topic: pedagogical but conversational, uses rhetorical questions and hedged claims, directly addresses students, builds understanding step by step."),
 
     # ── Personal / Conversational ────────────────────────────────────────────
     ("Reddit post",                "A casual first-person post on a subreddit relevant to the Wikipedia topic: conversational, opinionated, informal, may include personal anecdote or hot take."),
@@ -51,6 +71,10 @@ TEXT_GENRES = [
     ("intelligence briefing memo", "An internal intelligence or policy briefing memo on the Wikipedia topic: factual bullet-point summary, action items, need-to-know framing, bureaucratic precision, impersonal."),
     ("financial report excerpt",   "A passage from an annual report or earnings release about an entity related to the Wikipedia topic: numerical, forward-looking statements, formal investor register."),
     ("political manifesto excerpt","A programmatic statement of values and goals related to the Wikipedia topic: declarative, urgent, ideologically charged."),
+    ("sermon or religious address", "A passage from a sermon or religious speech using the Wikipedia topic as a moral or spiritual illustration: earnest, exhortatory, appeals to shared values, rhythmic repetition, second-person address to a congregation or assembly."),
+    ("internal corporate memo",    "A workplace memo about the Wikipedia topic addressed to staff or management: action-oriented, audience-aware, less formal than a press release, bullet-pointed directives, impersonal but accessible register."),
+    ("incident or police report",  "A formal record of an event related to the Wikipedia topic as it might appear in an official incident or police report: passive voice, third-person, precise dates and locations, bureaucratic documentation of facts without editorial interpretation."),
+    ("terms of service excerpt",   "A passage from user-facing legal terms or an end-user license agreement related to the Wikipedia topic: dense subordinate clauses, limitation-of-liability framing, enumerated conditions, consumer-legal register."),
 
     # ── Promotional / Commercial ─────────────────────────────────────────────
     ("advertisement copy",         "Promotional text selling the Wikipedia topic as a product, service, or experience: benefit-driven, imperative or second-person, punchy hook, call to action."),
@@ -58,6 +82,8 @@ TEXT_GENRES = [
     ("job posting",                "A job advertisement where the Wikipedia topic defines the role, field, or hiring organisation: role-focused requirements, bullet-pointed skills drawn from the topic, formal-yet-inviting register."),
     ("crowdfunding pitch",         "A campaign pitch seeking public backing for a project related to the Wikipedia topic: emotive, first-person, problem–solution–ask structure."),
     ("startup pitch",              "A paragraph from a venture-capital pitch whose product or market is drawn from the Wikipedia topic: market-size framing, problem–solution–traction structure, confident future-tense, business jargon."),
+    ("dating profile",             "A self-promotional first-person profile treating the Wikipedia topic as the subject seeking connection: aspirational, quirky self-description, highlights unique traits, appeals to shared interests — any topic reimagined as a personality looking for its match."),
+    ("business proposal",          "A formal pitch document proposing a project or partnership related to the Wikipedia topic: structured sections, ROI framing, deliverables-focused, B2B register — more formal and specific than a startup pitch, addressed to a known decision-maker."),
 
     # ── Service / Practical ──────────────────────────────────────────────────
     ("how-it-works explainer",     "A plain-language explainer breaking down the Wikipedia topic as a process or mechanism for a curious lay reader."),
@@ -92,26 +118,6 @@ TEXT_GENRES = [
     ("philosophical thought experiment","A hypothetical scenario inspired by the Wikipedia topic used to test a philosophical claim: precise setup, controlled variables, logical implication, abstract register."),
     ("therapy progress note",      "A clinician's session note in which the Wikipedia topic is the presenting concern or context: objective behavioral observations, affective assessment, treatment goals, impersonal third-person clinical register."),
     ("code comment or docstring",  "Inline developer documentation treating the Wikipedia topic as a software component: terse, imperative or descriptive, parameter- and return-value-focused, assumes reader can read code."),
-
-    # ── Multiple-Choice Questions (diverse domains) ──────────────────────────
-    # FORMAT FOR ALL MCQ GENRES — completely different from other genres:
-    #   "text"       : a SHORT CONTEXT (1–3 sentences of domain-relevant information inspired
-    #                  by the Wikipedia topic) FOLLOWED BY a question. No answer options in text.
-    #   "labels"     : list containing the correct answer(s), written as short answer strings.
-    #   "not_labels" : list of 3–5 plausible-but-wrong distractor answers, also short strings.
-    # The zero-shot model will receive `text` and must pick the right answer from
-    # the union of labels + not_labels. Distractors must be drawn from the same
-    # domain/category as the correct answer to be genuinely hard.
-    ("math MCQ",                   "Write a short factual context (1–3 sentences about the Wikipedia topic's quantitative aspects), then a mathematics question. Text = context + question (no options). labels = [correct numerical or symbolic answer]. not_labels = [3 wrong answers based on common errors, e.g. sign mistake, wrong formula, off-by-one]."),
-    ("history MCQ",                "Write a short historical context (1–3 sentences drawn from the Wikipedia topic), then a factual or interpretive question. Text = context + question (no options). labels = [correct answer: a name, date, event, or place]. not_labels = [3–4 answers from the same era/region that are plausibly confused with the correct one]."),
-    ("science MCQ",                "Write a short scientific context (1–3 sentences explaining the relevant concept or phenomenon from the Wikipedia topic), then a question. Text = context + question (no options). labels = [correct answer: a concept, formula, or value]. not_labels = [3 distractors reflecting typical misconceptions or unit/sign errors]."),
-    ("literature MCQ",             "Write a short literary context (1–3 sentences about the work, author, or movement connected to the Wikipedia topic), then a question. Text = context + question (no options). labels = [correct answer]. not_labels = [3–4 plausible but wrong interpretations, misattributed authors, or confused titles]."),
-    ("geography MCQ",              "Write a short geographic context (1–3 sentences describing the relevant place, region, or feature from the Wikipedia topic), then a question. Text = context + question (no options). labels = [correct answer: a location, feature, or fact]. not_labels = [3–4 nearby or commonly confused places or facts from the same region]."),
-    ("medicine & biology MCQ",     "Write a short biomedical context (1–3 sentences about the relevant anatomy, condition, or mechanism from the Wikipedia topic), then a question. Text = context + question (no options). labels = [correct answer: anatomical structure, drug, mechanism, or condition]. not_labels = [3–4 distractors targeting frequent confusions between related structures or mechanisms]."),
-    ("philosophy & ethics MCQ",    "Write a short philosophical context (1–3 sentences presenting the relevant argument, thinker, or ethical situation from the Wikipedia topic), then a question. Text = context + question (no options). labels = [correct answer: a philosopher, theory, term, or argument]. not_labels = [3–4 superficially similar positions, misattributions, or confused concepts]."),
-    ("law & civics MCQ",           "Write a short legal or civic context (1–3 sentences describing the relevant doctrine, institution, or case inspired by the Wikipedia topic), then a question. Text = context + question (no options). labels = [correct answer: a doctrine, article, institution, or right]. not_labels = [3–4 related but wrong doctrines or provisions that exploit legal ambiguity]."),
-    ("economics MCQ",              "Write a short economic context (1–3 sentences describing the relevant market situation, concept, or historical event from the Wikipedia topic), then a question. Text = context + question (no options). labels = [correct answer: a concept, effect, or definition]. not_labels = [3–4 distractors reflecting common confusions between related economic terms or effects]."),
-    ("computer science MCQ",       "Write a short technical context (1–3 sentences describing the relevant algorithm, data structure, or system from the Wikipedia topic), then a question. Text = context + question (no options). labels = [correct answer: a complexity class, output, or definition]. not_labels = [3 plausible-sounding but wrong complexities, outputs, or definitions]."),
-    ("general knowledge trivia MCQ","Write a short contextual setup (1–3 sentences of accessible background about the Wikipedia topic), then a trivia question. Text = context + question (no options). labels = [correct answer]. not_labels = [3–4 items from the same category that are commonly confused with the correct answer]."),
-    ("reading comprehension MCQ",  "Write a short passage (1–3 sentences) inspired by the Wikipedia topic, then a comprehension question testing inference, main idea, or vocabulary-in-context. Text = passage + question (no options). labels = [correct answer drawn from the passage]. not_labels = [3 plausible-sounding answers that require reading the passage to rule out]."),
+    ("museum audio guide script",  "A timed spoken-word guide for a visitor standing before an exhibit related to the Wikipedia topic: second-person address, paced for a two-minute listening experience, sensory prompts directing attention, builds to a closing reflection — evocative but informative."),
+    ("personal recommendation letter", "A formal letter endorsing a person, organisation, or initiative related to the Wikipedia topic: first-person endorser voice, specific evidence of merit, formal salutation and close, testimonial register — distinct from a press release in its personal accountability."),
 ]
