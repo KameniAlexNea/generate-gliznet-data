@@ -2,17 +2,20 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
 from datasets import load_dataset
 from llm_output_parser import parse_json
-import httpx
 from openai import AsyncOpenAI, APIConnectionError, APIError, APITimeoutError
 from tqdm import tqdm
 
 from src.config import Config
 from src.prompt_amazon import AMAZON_SYSTEM_PROMPT
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,8 +51,8 @@ async def _call_api(
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                top_p=0.95,
-                extra_body={"top_k": 64},
+                reasoning_effort="high",
+                extra_body={"thinking": {"type": "enabled"}},
             )
             return response.choices[0].message.content
         except (APIError, APITimeoutError, APIConnectionError) as exc:
@@ -160,12 +163,12 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--output_path", default="data/amazon_annotated.jsonl")
     p.add_argument(
-        "--model", default="Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled"
+        "--model", default="deepseek-v4-pro"
     )
     p.add_argument(
         "--api_base",
-        default="http://localhost:8000/v1",
-        help="Base URL of the vLLM OpenAI-compatible server.",
+        default="https://api.deepseek.com",
+        help="DeepSeek API base URL.",
     )
     p.add_argument("--num_examples", type=int, default=10000)
     p.add_argument(
@@ -219,21 +222,11 @@ async def main() -> None:
     )
     ds_iter = ds.skip(skip).take(remaining)
 
-    health_url = args.api_base.rstrip("/").removesuffix("/v1") + "/health"
-    logger.info(f"Waiting for vLLM server at {health_url} ...")
-    async with httpx.AsyncClient() as hc:
-        while True:
-            try:
-                r = await hc.get(health_url, timeout=5.0)
-                if r.status_code == 200:
-                    break
-            except Exception:
-                pass
-            logger.info("Server not ready, retrying in 5 s...")
-            await asyncio.sleep(5)
-    logger.info("Server is up.")
-
-    client = AsyncOpenAI(base_url=args.api_base, api_key="EMPTY", max_retries=0)
+    client = AsyncOpenAI(
+        api_key=os.environ.get("DEEPSEEK_API_KEY"),
+        base_url=args.api_base,
+        max_retries=0,
+    )
 
     counters = {"success": 0, "failure": 0}
     queue: asyncio.Queue = asyncio.Queue(maxsize=args.batch_size * 2)

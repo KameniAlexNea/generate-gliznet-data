@@ -2,7 +2,7 @@
 # Run this in a dedicated terminal / tmux pane.
 # The server must be up before starting main.py.
 
-MODEL="Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled"
+MODEL="Jackrong/Qwen3.5-9B-DeepSeek-V4-Flash"
 
 nohup timeout 16h vllm serve "$MODEL" \
     --tensor-parallel-size 2 \
