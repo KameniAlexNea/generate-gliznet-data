@@ -1,7 +1,7 @@
 nohup timeout 10h python annotate_amazon.py \
     --output_path data/amazon_annotated.jsonl \
-    --model deepseek-v4-pro \
-    --api_base https://api.deepseek.com \
+    --model Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled \
+    --api_base http://localhost:8000/v1 \
     --num_examples 50000 \
     --batch_size 16 \
     --max_tokens 2048 \

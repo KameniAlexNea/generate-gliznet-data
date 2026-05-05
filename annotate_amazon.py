@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -13,9 +12,6 @@ from tqdm import tqdm
 
 from src.config import Config
 from src.prompt_amazon import AMAZON_SYSTEM_PROMPT
-from dotenv import load_dotenv
-
-load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,8 +47,8 @@ async def _call_api(
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                reasoning_effort="high",
-                extra_body={"thinking": {"type": "enabled"}},
+                top_p=0.95,
+                extra_body={"top_k": 64},
             )
             return response.choices[0].message.content
         except (APIError, APITimeoutError, APIConnectionError) as exc:
@@ -111,7 +107,8 @@ async def _worker(
         else:
             try:
                 annotation = parse_json(content)
-            except Exception:
+            except Exception as exc:
+                logger.warning("parse_json failed: %s\nRaw content:\n%s", exc, content[:500])
                 annotation = None
             record = _expand_annotation(annotation, text, sentiment)
             if record is not None:
@@ -129,11 +126,12 @@ async def _worker(
 # Helpers
 # ---------------------------------------------------------------------------
 
-_MIN_LABELS = 10  # tolerate slight under-generation
+_MIN_LABELS = 5  # tolerate slight under-generation
 
 
 def _expand_annotation(obj, text: str, sentiment: str) -> dict | None:
     if not isinstance(obj, dict):
+        logger.warning("_expand_annotation: expected dict, got %s: %r", type(obj).__name__, obj)
         return None
     labels = [str(l).strip() for l in obj.get("labels", []) if str(l).strip()]
     not_labels = [str(l).strip() for l in obj.get("not_labels", []) if str(l).strip()]
@@ -142,6 +140,10 @@ def _expand_annotation(obj, text: str, sentiment: str) -> dict | None:
     labels = [l for l in labels if l not in intersection]
     not_labels = [l for l in not_labels if l not in intersection]
     if len(labels) < _MIN_LABELS or len(not_labels) < _MIN_LABELS:
+        logger.warning(
+            "_expand_annotation: too few labels after dedup — labels=%d, not_labels=%d (min=%d). Keys in obj: %s",
+            len(labels), len(not_labels), _MIN_LABELS, list(obj.keys()),
+        )
         return None
     return {
         "source": "amazon_polarity",
@@ -163,12 +165,12 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--output_path", default="data/amazon_annotated.jsonl")
     p.add_argument(
-        "--model", default="deepseek-v4-pro"
+        "--model", default="Jackrong/Qwen3.5-9B-DeepSeek-V4-Flash"
     )
     p.add_argument(
         "--api_base",
-        default="https://api.deepseek.com",
-        help="DeepSeek API base URL.",
+        default="http://localhost:8000/v1",
+        help="OpenAI-compatible API base URL (vLLM).",
     )
     p.add_argument("--num_examples", type=int, default=10000)
     p.add_argument(
@@ -222,11 +224,7 @@ async def main() -> None:
     )
     ds_iter = ds.skip(skip).take(remaining)
 
-    client = AsyncOpenAI(
-        api_key=os.environ.get("DEEPSEEK_API_KEY"),
-        base_url=args.api_base,
-        max_retries=0,
-    )
+    client = AsyncOpenAI(base_url=args.api_base, api_key="EMPTY", max_retries=0)
 
     counters = {"success": 0, "failure": 0}
     queue: asyncio.Queue = asyncio.Queue(maxsize=args.batch_size * 2)
