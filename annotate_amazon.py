@@ -2,12 +2,17 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import sys
+
+from dotenv import load_dotenv
+
+load_dotenv()
 from pathlib import Path
 
 from datasets import load_dataset
 from llm_output_parser import parse_json
-from openai import AsyncOpenAI, APIConnectionError, APIError, APITimeoutError
+from openai import AsyncOpenAI, APIConnectionError, APIError, APITimeoutError, RateLimitError
 from tqdm import tqdm
 
 from src.config import Config
@@ -39,21 +44,35 @@ async def _call_api(
     model: str,
     temperature: float,
     max_tokens: int,
+    use_top_k: bool = True,
+    semaphore: asyncio.Semaphore | None = None,
 ) -> str | None:
-    for attempt in range(5):
+    for attempt in range(8):
         try:
-            response = await client.chat.completions.create(
+            kwargs = dict(
                 model=model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=0.95,
-                extra_body={"top_k": 64},
             )
+            if use_top_k:
+                kwargs["extra_body"] = {"top_k": 64}
+            if semaphore is not None:
+                async with semaphore:
+                    response = await client.chat.completions.create(**kwargs)
+            else:
+                response = await client.chat.completions.create(**kwargs)
             return response.choices[0].message.content
+        except RateLimitError as exc:
+            retry_after = 60
+            if hasattr(exc, "response") and exc.response is not None:
+                retry_after = int(exc.response.headers.get("Retry-After", 60))
+            logger.warning("Rate limited (429). Waiting %ds (attempt %d/8).", retry_after, attempt + 1)
+            await asyncio.sleep(retry_after)
         except (APIError, APITimeoutError, APIConnectionError) as exc:
-            if attempt == 4:
-                logger.warning("API call failed after 5 attempts: %s", exc)
+            if attempt == 7:
+                logger.warning("API call failed after 8 attempts: %s", exc)
                 return None
             await asyncio.sleep(2**attempt)
         except Exception as exc:
@@ -92,6 +111,8 @@ async def _worker(
     max_tokens: int,
     counters: dict,
     pbar,
+    use_top_k: bool = True,
+    semaphore: asyncio.Semaphore | None = None,
 ) -> None:
     while True:
         item = await queue.get()
@@ -100,7 +121,7 @@ async def _worker(
             break
         text, sentiment = item
         content = await _call_api(
-            client, _build_messages(text), model, temperature, max_tokens
+            client, _build_messages(text), model, temperature, max_tokens, use_top_k, semaphore
         )
         if content is None:
             counters["failure"] += 1
@@ -194,6 +215,17 @@ def parse_args() -> argparse.Namespace:
         help="Examples to skip (resume support).",
     )
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
+        "--concurrency",
+        type=int,
+        default=None,
+        help="Max concurrent in-flight API requests (default: same as batch_size). Lower this to avoid 429s.",
+    )
+    p.add_argument(
+        "--openrouter_api_key",
+        default=os.environ.get("OPENROUTER_API_KEY"),
+        help="OpenRouter API key. If set, routes through OpenRouter instead of vLLM.",
+    )
     return p.parse_args()
 
 
@@ -224,7 +256,25 @@ async def main() -> None:
     )
     ds_iter = ds.skip(skip).take(remaining)
 
-    client = AsyncOpenAI(base_url=args.api_base, api_key="EMPTY", max_retries=0)
+    if args.openrouter_api_key:
+        logger.info("Using OpenRouter backend.")
+        client = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=args.openrouter_api_key,
+            max_retries=0,
+            default_headers={
+                "HTTP-Referer": "https://github.com/generate-gliznet-data",
+                "X-Title": "generate-gliznet-data",
+            },
+        )
+        use_top_k = False
+    else:
+        client = AsyncOpenAI(base_url=args.api_base, api_key="EMPTY", max_retries=0)
+        use_top_k = True
+
+    concurrency = args.concurrency if args.concurrency is not None else args.batch_size
+    semaphore = asyncio.Semaphore(concurrency)
+    logger.info(f"Workers: {args.batch_size}, max concurrent API calls: {concurrency}")
 
     counters = {"success": 0, "failure": 0}
     queue: asyncio.Queue = asyncio.Queue(maxsize=args.batch_size * 2)
@@ -237,7 +287,7 @@ async def main() -> None:
                     _worker(
                         queue, out_file, lock, client,
                         args.model, args.temperature, args.max_tokens,
-                        counters, pbar,
+                        counters, pbar, use_top_k, semaphore,
                     )
                 )
                 for _ in range(args.batch_size)
