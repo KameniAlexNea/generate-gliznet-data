@@ -1,4 +1,4 @@
-AMAZON_SYSTEM_PROMPT = """\
+AMAZON_SYSTEM_PROMPT = """
 You are a semantic annotation engine.
 
 Given an Amazon product review, generate exactly 50 labels that APPLY to this review \

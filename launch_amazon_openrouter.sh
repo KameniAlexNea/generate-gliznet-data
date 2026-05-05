@@ -7,5 +7,6 @@ nohup timeout 10h python annotate_amazon.py \
     --max_tokens 2048 \
     --temperature 0.7 \
     --split train \
-    --skip 0 &> amazon_annotated_openrouter.log &
+    --skip 0 \
+    --use_openrouter &> amazon_annotated_openrouter.log &
 echo "amazon-annotate-openrouter PID: $!"

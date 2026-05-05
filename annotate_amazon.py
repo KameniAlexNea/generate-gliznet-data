@@ -57,7 +57,7 @@ async def _call_api(
                 top_p=0.95,
             )
             if use_top_k:
-                kwargs["extra_body"] = {"top_k": 64}
+                kwargs["extra_body"] = {"top_k": 64, "chat_template_kwargs": {"enable_thinking": False}}
             if semaphore is not None:
                 async with semaphore:
                     response = await client.chat.completions.create(**kwargs)
@@ -222,9 +222,9 @@ def parse_args() -> argparse.Namespace:
         help="Max concurrent in-flight API requests (default: same as batch_size). Lower this to avoid 429s.",
     )
     p.add_argument(
-        "--openrouter_api_key",
-        default=os.environ.get("OPENROUTER_API_KEY"),
-        help="OpenRouter API key. If set, routes through OpenRouter instead of vLLM.",
+        "--use_openrouter",
+        action="store_true",
+        help="Route requests through OpenRouter. Reads OPENROUTER_API_KEY from env/.env.",
     )
     return p.parse_args()
 
@@ -256,11 +256,14 @@ async def main() -> None:
     )
     ds_iter = ds.skip(skip).take(remaining)
 
-    if args.openrouter_api_key:
+    if args.use_openrouter:
+        openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not openrouter_api_key:
+            raise ValueError("OPENROUTER_API_KEY not set in environment or .env file")
         logger.info("Using OpenRouter backend.")
         client = AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1",
-            api_key=args.openrouter_api_key,
+            api_key=openrouter_api_key,
             max_retries=0,
             default_headers={
                 "HTTP-Referer": "https://github.com/generate-gliznet-data",
