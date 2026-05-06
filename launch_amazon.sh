@@ -7,5 +7,5 @@ nohup timeout 15h python annotate_amazon.py \
     --max_tokens 2048 \
     --temperature 0.7 \
     --split train \
-    --skip 3000 &> amazon_annotated.log &
+    --skip 53000 &> amazon_annotated.log &
 echo "amazon-annotate PID: $!"
