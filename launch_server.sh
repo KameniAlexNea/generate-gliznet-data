@@ -4,7 +4,7 @@
 
 MODEL="google/gemma-4-E4B-it"
 
-nohup timeout 16h vllm serve "$MODEL" \
+nohup timeout 7h vllm serve "$MODEL" \
     --served-model-name gliznet-data \
     --tensor-parallel-size 2 \
     --port 8000 \
