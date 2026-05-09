@@ -11,6 +11,6 @@ class Config:
     # How many labels are assigned as positive / negative per text.
     # Skew toward more negatives to match real-world class imbalance.
     POSITIVE_LABELS_MIN = 1
-    POSITIVE_LABELS_MAX = 4
-    NEGATIVE_LABELS_MIN = 4
-    NEGATIVE_LABELS_MAX = 8
+    POSITIVE_LABELS_MAX = 5
+    NEGATIVE_LABELS_MIN = 8
+    NEGATIVE_LABELS_MAX = 15

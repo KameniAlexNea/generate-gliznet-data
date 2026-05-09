@@ -33,11 +33,17 @@ USER_TEMPLATE = (
 )
 
 
-def _build_messages(title: str, text: str) -> list:
+def _build_messages(title: str, text: str, max_paragraphs: int = 5) -> tuple[list, dict]:
     name, desc = random.choice(TEXT_GENRES)
     genres_block = f"{name}: {desc}"
     length_label, length_instruction = random.choice(TEXT_LENGTHS)
     level_label, level_instruction = random.choice(LANGUAGE_LEVELS)
+    paragraphs = [p for p in text.split("\n\n") if p.strip()]
+    if len(paragraphs) < max_paragraphs:
+        text = "\n\n".join(paragraphs)
+    else:
+        index = random.choice(range(len(paragraphs) - max_paragraphs + 1))
+        text = "\n\n".join(paragraphs[index : index + max_paragraphs])
     user_content = USER_TEMPLATE.format(
         genres_block=genres_block + "\n",
         length_label=length_label,
@@ -47,10 +53,12 @@ def _build_messages(title: str, text: str) -> list:
         title=title,
         text=text,
     )
-    return [
+    messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_content[: Config.MAX_INPUT_TOKENS]},
     ]
+    meta = {"genre": name, "language_level": level_label}
+    return messages, meta
 
 
 async def _call_api(
@@ -110,6 +118,7 @@ async def _worker(
     max_tokens: int,
     counters: dict,
     pbar,
+    max_paragraphs: int = 5,
 ) -> None:
     while True:
         item = await queue.get()
@@ -117,8 +126,9 @@ async def _worker(
             queue.task_done()
             break
         title, text = item
+        messages, meta = _build_messages(title, text, max_paragraphs)
         content = await _call_api(
-            client, _build_messages(title, text), model, temperature, max_tokens
+            client, messages, model, temperature, max_tokens
         )
         if content is None:
             counters["failure"] += 1
@@ -129,7 +139,7 @@ async def _worker(
                 bundle = None
             if bundle and _validate_bundle(bundle):
                 async with lock:
-                    for example in _expand_bundle(bundle):
+                    for example in _expand_bundle(bundle, meta):
                         out_file.write(json.dumps(example, ensure_ascii=False) + "\n")
                         counters["success"] += 1
                     out_file.flush()
@@ -153,7 +163,7 @@ def _validate_bundle(obj: dict) -> bool:
     )
 
 
-def _expand_bundle(bundle: dict) -> list[dict]:
+def _expand_bundle(bundle: dict, meta: dict) -> list[dict]:
     """Expand a bundle into individual JSONL-ready example dicts, skipping invalid examples."""
     results = []
     for ex in bundle["examples"]:
@@ -172,6 +182,8 @@ def _expand_bundle(bundle: dict) -> list[dict]:
         results.append(
             {
                 "source": "wikipedia",
+                "genre": meta["genre"],
+                "language_level": meta["language_level"],
                 "text": text,
                 "labels": labels,
                 "not_labels": not_labels,
@@ -214,6 +226,12 @@ def parse_args() -> argparse.Namespace:
         help="Articles to skip after shuffle (resume support).",
     )
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
+        "--max_paragraphs",
+        type=int,
+        default=5,
+        help="Maximum number of paragraphs to pass from each Wikipedia article.",
+    )
     p.add_argument(
         "--shuffle_buffer",
         type=int,
@@ -282,7 +300,7 @@ async def main() -> None:
                     _worker(
                         queue, out_file, lock, client,
                         args.model, args.temperature, args.max_tokens,
-                        counters, pbar,
+                        counters, pbar, args.max_paragraphs,
                     )
                 )
                 for _ in range(args.batch_size)
