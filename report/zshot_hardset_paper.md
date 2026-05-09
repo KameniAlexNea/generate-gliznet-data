@@ -7,7 +7,7 @@
 
 ## Abstract
 
-Zero-shot text classification (ZSC) benchmarks typically rely on surface-level topic labels (e.g., "sports", "politics") that can be matched through lexical overlap rather than genuine semantic understanding. We present **ZSHOT-HARDSET-v2**, a synthetic dataset of ~600k examples designed around *hard-negative semantic labels* that require inferential reading to distinguish. Each example pairs a text with positive labels describing its meaning, rhetorical stance, and epistemic function, alongside carefully crafted negative labels that are plausible enough to fool a naive classifier but demonstrably false upon careful reading. Texts are generated from Wikipedia articles rewritten into 70 text registers; each bundle of 5 texts shares 15 semantic labels satisfying a cross-role constraint — every label must appear as both positive and negative across different texts within the same bundle. We describe the iterative development from an initial v1 (context-free generation with unconstrained labels) to v2 (Wikipedia-grounded generation with the cross-role constraint), showing how each design decision was motivated by observed failure modes. We demonstrate the dataset's utility through downstream evaluation on GliZNet, a zero-shot classification model that achieves 0.6701 average macro F1 on the GLiClass benchmark — competitive with models using 2× more data and multi-stage training with reinforcement learning. The dataset and generation code are publicly released.
+Zero-shot text classification (ZSC) benchmarks typically rely on surface-level topic labels (e.g., "sports", "politics") that can be matched through lexical overlap rather than genuine semantic understanding. We present **ZSHOT-HARDSET-v2**, a synthetic dataset of ~900k examples (and growing) designed around *hard-negative semantic labels* that require inferential reading to distinguish. Each example pairs a text with positive labels describing its meaning, rhetorical stance, and epistemic function, alongside carefully crafted negative labels that are plausible enough to fool a naive classifier but demonstrably false upon careful reading. Texts are generated from Wikipedia articles rewritten into 70 text registers; each bundle of 5 texts shares 15 semantic labels satisfying a cross-role constraint — every label must appear as both positive and negative across different texts within the same bundle. We describe the iterative development from an initial v1 (context-free generation with unconstrained labels) to v2 (Wikipedia-grounded generation with the cross-role constraint), showing how each design decision was motivated by observed failure modes. We demonstrate the dataset's utility through downstream evaluation on GliZNet, a zero-shot classification model that achieves 0.6701 average macro F1 on the GLiClass benchmark — competitive with models using 2× more data and multi-stage training with reinforcement learning. The dataset and generation code are publicly released.
 
 ---
 
@@ -21,6 +21,8 @@ We argue that the key to robust zero-shot generalization lies in training with *
 
 1. **Wikipedia-grounded genre-injected generation**: Each example is generated from a real Wikipedia article rewritten into one of 70 diverse text registers, preventing the repetitive and context-free outputs observed in our initial v1 approach.
 2. **The cross-role constraint**: Within each bundle of 5 texts sharing 15 semantic labels, every label must appear as a positive in at least one text and as a negative in at least one different text — preventing the label-isolation failures observed in v1 and forcing models to learn deep text–label alignment rather than linearly separable label representations.
+
+At ~900k examples and growing, ZSHOT-HARDSET-v2 aims to become the largest open-source training dataset for zero-shot text classification.
 
 Our contributions are:
 
@@ -157,20 +159,23 @@ The system prompt instructs the LLM to:
 
 ### 4.3 LLM Generation
 
-Generation uses a locally served LLM via vLLM:
+Generation uses a locally served LLM via vLLM. The project went through two generating models:
+
+1. **Initial generation**: `Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled` (27B parameters, reasoning-distilled). This model produced high-quality bundles but was prohibitively slow due to its reasoning chain-of-thought overhead — each generation included an internal reasoning trace before the JSON output, significantly increasing latency and reducing throughput.
+
+2. **Current generation**: `google/gemma-4-E4B-it` (Gemma 4, released 2026, mixture-of-experts with only 4B active parameters). Despite being dramatically smaller in active parameter count, Gemma 4 E4B produces comparable label quality at much higher throughput, enabling the scale-up to ~900k examples. The smaller active footprint also reduces GPU memory pressure, allowing higher concurrency.
 
 | Parameter | Value |
 |-----------|-------|
-| Model | `Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled` (27B, reasoning-distilled) |
+| Current model | `google/gemma-4-E4B-it` (4B active params, MoE) |
+| Previous model | `Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled` (27B, reasoning) |
 | Serving | vLLM with tensor parallelism (2 GPUs), `bfloat16`, prefix caching enabled |
-| Temperature | 0.7–0.9 |
+| Temperature | 0.7 |
 | Top-p | 0.95 |
 | Top-k | 64 |
 | Max output tokens | 4,096 |
 | Max input tokens | 6,144 |
-| Concurrency | 16–48 concurrent API requests via async workers |
-
-An additional model, `google/gemma-4-E4B-it`, was used in some generation runs for diversity.
+| Concurrency | 48 concurrent async workers |
 
 The pipeline uses an async producer–consumer architecture: a feed task streams articles from the dataset into an `asyncio.Queue`, and a pool of worker tasks dequeue articles, build prompts, call the API, validate responses, and write results to a JSONL file under a shared lock.
 
@@ -205,7 +210,7 @@ This yields approximately 30% novel labels in the test set — labels never enco
 
 | Property | Value |
 |----------|-------|
-| Total examples | ~600,000 |
+| Total examples | ~900,000 (actively expanding) |
 | Source | Wikipedia (`20231101.en`) |
 | Distinct genres | 70 |
 | Language levels | 5 (A2, B1, B2, C1, C2) |
@@ -213,7 +218,7 @@ This yields approximately 30% novel labels in the test set — labels never enco
 | Labels per bundle | 15 shared |
 | Positive labels per text | 1–5 |
 | Negative labels per text | 8–15 |
-| Generation model | Qwen3.5-27B (reasoning-distilled), Gemma 4 E4B |
+| Generation model | Gemma 4 E4B (4B active, MoE); initial runs used Qwen3.5-27B |
 | Format | JSONL |
 | License | See repository |
 
@@ -295,10 +300,10 @@ On the 10-dataset GLiClass benchmark (Stepanov et al., 2025):
 |-------|--------|---------------|-------------------|-------------|
 | GLiClass-large-v3 | 439M | 1.2M examples | 3-stage (pretrain + RL + LoRA) | 0.7417 |
 | GLiClass-base-v3 | 187M | 1.2M examples | 3-stage (pretrain + RL + LoRA) | 0.7056 |
-| **GliZNet** | **184M** | **~600k examples** | **1-stage (supervised)** | **0.6701** |
+| **GliZNet** | **184M** | **~900k examples** | **1-stage (supervised)** | **0.6701** |
 | GLiClass-modern-base-v3 | 151M | 1.2M examples | 3-stage (pretrain + RL + LoRA) | 0.6170 |
 
-GliZNet achieves 0.6701 avg F1 with half the training data, no reinforcement learning, and a single-stage pipeline. The gap to GLiClass-base (−0.0355) is modest and suggests that the *quality* of ZSHOT-HARDSET-v2's hard-negative semantic labels partially compensates for the quantity and training complexity advantage.
+GliZNet achieves 0.6701 avg F1 with less training data, no reinforcement learning, and a single-stage pipeline. The gap to GLiClass-base (−0.0355) is modest and suggests that the *quality* of ZSHOT-HARDSET-v2's hard-negative semantic labels partially compensates for the training complexity advantage.
 
 Per-dataset breakdown:
 
@@ -369,7 +374,7 @@ The prompt explicitly contrasts shallow and deep labels with examples. Replacing
 
 4. **Genre distribution is uniform by design**, which may not match the register distribution of downstream applications. Weighted sampling of genres could be used to tailor the dataset to specific domains.
 
-5. **Reproducibility depends on LLM availability**: The generating models (`Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled`, `google/gemma-4-E4B-it`) are open-weight but may be updated or removed. The generation code is fully released to enable regeneration with alternative models.
+5. **Reproducibility depends on LLM availability**: The generating models (`google/gemma-4-E4B-it`, `Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled`) are open-weight but may be updated or removed. The generation code is fully released to enable regeneration with alternative models.
 
 ---
 
@@ -387,7 +392,7 @@ ZSHOT-HARDSET-v2 introduces a principled approach to training data for zero-shot
 
 The iterative development from v1 to v2 revealed two critical failure modes — text repetition without grounding context, and label isolation without the cross-role constraint — and demonstrated that each fix directly improved downstream model quality. The cross-role constraint is particularly important: by requiring the same label to be positive for some texts and negative for others, it makes label-identity-based separable hyperplanes impossible and forces models to learn genuine text–label alignment through embedding interaction.
 
-Trained on ZSHOT-HARDSET-v2, GliZNet achieves competitive zero-shot performance (0.6701 avg F1) with half the training data, no reinforcement learning, and a single-stage pipeline compared to GLiClass models using multi-stage training. The dataset's advantage is most pronounced on tasks requiring fine-grained label discrimination (SST-5), validating the hard-negative design.
+Trained on ZSHOT-HARDSET-v2, GliZNet achieves competitive zero-shot performance (0.6701 avg F1) with no reinforcement learning and a single-stage pipeline compared to GLiClass models using multi-stage training. The dataset's advantage is most pronounced on tasks requiring fine-grained label discrimination (SST-5), validating the hard-negative design.
 
 The dataset, generation code, and trained models are publicly available:
 

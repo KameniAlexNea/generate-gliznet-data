@@ -1,29 +1,19 @@
 # generate-gliznet-data
 
-**Generation pipeline for [ZSHOT-HARDSET-v2](https://huggingface.co/datasets/alexneakameni/ZSHOT-HARDSET-v2) and [ZSHOT-HARDSET-Polarity](https://huggingface.co/datasets/alexneakameni/ZSHOT-HARDSET-Polarity) — hard-negative zero-shot text classification benchmarks.**
+**Generation pipeline for [ZSHOT-HARDSET-v2](https://huggingface.co/datasets/alexneakameni/ZSHOT-HARDSET-v2) — the largest open-source hard-negative dataset for training zero-shot text classification models.**
 
 ---
 
 ## Overview
 
-This repository contains the generation pipelines for two complementary zero-shot text classification datasets. Unlike standard ZSC datasets that rely on surface-level topic matching, these datasets target *semantic* understanding: labels describe meaning, intent, rhetorical stance, and epistemic function — not keywords.
-
-### ZSHOT-HARDSET-v2 (Wikipedia)
+This repository contains the generation pipeline for ZSHOT-HARDSET-v2, a large-scale synthetic dataset (~900k examples and growing) for zero-shot text classification. Unlike standard ZSC datasets that rely on surface-level topic matching, ZSHOT-HARDSET-v2 targets *semantic* understanding: labels describe meaning, intent, rhetorical stance, and epistemic function — not keywords.
 
 Each example contains:
-- `text` — an original short passage (2–3 sentences) written in a specific genre/register
-- `labels` — 3–5 labels that are **semantically true** for this text
-- `not_labels` — 3–5 labels that are **plausible but wrong**: they would fool a naive classifier but are clearly false to a careful reader
+- `text` — an original short passage written in a specific genre/register, inspired by a Wikipedia article
+- `labels` — 1–5 labels that are **semantically true** for this text
+- `not_labels` — 8–15 labels that are **plausible but wrong**: they would fool a naive classifier but are clearly false to a careful reader
 
-### ZSHOT-HARDSET-Polarity (Amazon Reviews)
-
-Each example contains:
-- `text` — an Amazon product review (title + content)
-- `sentiment` — the ground-truth sentiment (`positive` / `negative`)
-- `labels` — **50** labels that are semantically true for this review
-- `not_labels` — **50** labels that are plausible but wrong
-
-The key difference from the Wikipedia variant is the **scale of labels**: 50 positive and 50 negative labels per example, requiring fine-grained semantic distinctions about rhetorical stance, emotional register, argumentative moves, writing style, and epistemic signals.
+Our goal is to build the **largest open-source training dataset for zero-shot text classification**, with ongoing generation scaling beyond 1M examples.
 
 ---
 
@@ -66,27 +56,6 @@ The dataset uses a label-based split to encourage zero-shot evaluation:
 
 This yields ~30% novel labels in the test set (labels never seen during training), forcing the model to generalise to unseen semantic categories.
 
-### Amazon Polarity Pipeline (ZSHOT-HARDSET-Polarity)
-
-#### 1. Source: Amazon Polarity
-Reviews are streamed from `fancyzhx/amazon_polarity` via HuggingFace Datasets. Each review includes a title, content, and binary sentiment label.
-
-#### 2. LLM annotation
-Each review is annotated by an LLM that generates **50 positive labels** and **50 negative labels** per review. Labels describe:
-- Rhetorical stance (what claim the reviewer is making and how)
-- Emotional register (feeling the text conveys or appeals to)
-- Argumentative moves (evidence or reasoning structure)
-- Implied relationship to the product (expert, casual buyer, gift buyer…)
-- Writing style markers (colloquial, formal, hyperbolic, hedged…)
-- Epistemic signals (certainty, doubt, recommendation, warning…)
-- Discourse function (introduces, contrasts, exemplifies, concedes…)
-
-Labels are short `snake_case` phrases (2–5 words) and must **not** include product names, brands, category keywords, or generic sentiment words.
-
-#### 3. Post-processing
-- Parsed and validated; malformed JSON or under-generated annotations (< 5 labels) are discarded
-- Any label appearing in both `labels` and `not_labels` is removed from both lists
-
 ---
 
 ## Repository Structure
@@ -94,13 +63,10 @@ Labels are short `snake_case` phrases (2–5 words) and must **not** include pro
 ```
 generate-gliznet-data/
 ├── main.py                  # Wikipedia pipeline: stream, generate, write JSONL
-├── annotate_amazon.py       # Amazon Polarity pipeline: annotate reviews
 ├── launch.sh                # Launch command for Wikipedia generation
-├── launch_amazon.sh         # Launch command for Amazon annotation (local vLLM)
-├── launch_amazon_openrouter.sh  # Launch command for Amazon annotation (OpenRouter)
+├── launch_server.sh         # Launch vLLM server
 ├── src/
 │   ├── prompt.py            # System prompt for Wikipedia generation
-│   ├── prompt_amazon.py     # System prompt for Amazon annotation
 │   ├── genres.py            # 70 text genre definitions
 │   └── config.py            # Token budget and generation constants
 ├── notebooks/
@@ -131,8 +97,7 @@ python main.py \
 
 ## Links
 
-- **ZSHOT-HARDSET-v2 (Wikipedia)**: [alexneakameni/ZSHOT-HARDSET-v2](https://huggingface.co/datasets/alexneakameni/ZSHOT-HARDSET-v2)
-- **ZSHOT-HARDSET-Polarity (Amazon)**: [alexneakameni/ZSHOT-HARDSET-Polarity](https://huggingface.co/datasets/alexneakameni/ZSHOT-HARDSET-Polarity)
+- **ZSHOT-HARDSET-v2**: [alexneakameni/ZSHOT-HARDSET-v2](https://huggingface.co/datasets/alexneakameni/ZSHOT-HARDSET-v2)
 - **Generation code**: [KameniAlexNea/generate-gliznet-data](https://github.com/KameniAlexNea/generate-gliznet-data)
 
 ---
