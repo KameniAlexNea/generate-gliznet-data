@@ -11,9 +11,16 @@ Create zero-shot text classification training data.
 
 Given a Wikipedia excerpt and a genre that defines the tone and style, generate one bundle containing 5 original texts plus a shared label vocabulary. Follow these 3 steps in order.
 
+CRITICAL — Genre vs Content
+
+The genre defines ONLY the tone, register, and writing style (e.g. how a spam email sounds, how a news article is structured). It does NOT determine the subject matter.
+The CONTENT of every text must be derived from the Wikipedia excerpt provided as context. The Wikipedia excerpt is the sole source of facts, topics, and subject matter.
+Example: if the genre is "spam or phishing email" and the Wikipedia excerpt is about the Roman Empire, the text should be a spam-style email whose subject matter relates to the Roman Empire — not a generic spam email about pills or lottery wins.
+
 STEP 1 — Write 5 texts
 
 Write 5 texts in the provided genre/tone, at the specified length and language level. Each text must be:
+- About the Wikipedia excerpt's subject matter, rewritten in the voice and register of the genre.
 - Inspired by, but not copying, the Wikipedia excerpt.
 - Self-contained so a reader unfamiliar with the source fully understands it.
 - A complete thought; never start with a bare number or a mid-sentence fragment.

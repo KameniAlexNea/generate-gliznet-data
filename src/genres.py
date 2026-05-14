@@ -136,4 +136,29 @@ TEXT_GENRES = [
     ("quality or grade description", "A quality-assessment passage about the Wikipedia topic treated as a product, specimen, or output being graded: descriptive language that implies a specific quality tier (defective, below average, acceptable, good, exemplary) without stating the grade explicitly — the reader infers the tier from details and tone."),
     ("urgency communication",      "A message about the Wikipedia topic whose register and framing encode a specific urgency level: from routine informational notice through advisory, to action-required warning, to immediate-response demand — sentence length, imperative density, and temporal framing must match the urgency tier."),
     ("commitment or conviction statement", "A statement of intent, belief, or allegiance related to the Wikipedia topic at a specific conviction level: from tentative openness through cautious support, firm commitment, passionate advocacy, to unconditional devotion — the strength of modal verbs, repetition, and rhetorical intensity must encode the level."),
+
+    # ── Email Domain ─────────────────────────────────────────────────────────
+    ("email newsletter",           "A subscription newsletter excerpt about the Wikipedia topic: promotional but legitimate, opt-in language, unsubscribe footer, branded tone — the kind of regular email a reader has signed up for."),
+    ("spam or phishing email",     "An unsolicited commercial or scam email about the Wikipedia topic: urgent call to action, too-good-to-be-true offers, obfuscated links, impersonation — the reader should recognise the manipulative register."),
+    ("corporate email thread",     "An internal work email exchange about the Wikipedia topic: logistics, scheduling, project updates, reply-chain conventions, CC-heavy — informal-professional register."),
+    ("automated notification email","A system-generated email about the Wikipedia topic: order confirmations, password resets, account alerts, templated structure, minimal prose, transactional register."),
+
+    # ── Fine-Grained Sentiment Gradation ─────────────────────────────────────
+    ("mixed or ambivalent review", "A product, film, or service review about the Wikipedia topic that deliberately mixes praise and criticism: 'the X was brilliant but the Y ruined it' — conflicting signals within a single text, no clear polarity."),
+    ("lukewarm or tepid endorsement","Faint praise or reluctant recommendation of the Wikipedia topic: hedged language ('it's fine', 'not bad'), damning-with-faint-praise register — targets the neutral/positive boundary."),
+    ("sarcastic or ironic praise", "Text that uses positive words with negative intent about the Wikipedia topic: sarcasm, irony, backhanded compliments — surface lexicon is positive but true sentiment is negative or mocking."),
+
+    # ── Topic-Forum Discourse ────────────────────────────────────────────────
+    ("technical hobbyist forum post","An enthusiast discussion post about the Wikipedia topic in a niche hobby community (cars, electronics, crafts): informal expertise, community jargon, troubleshooting tone."),
+    ("religious or philosophical discussion post","An online discussion of belief, doctrine, or moral questions inspired by the Wikipedia topic: personal conviction mixed with argumentation, community identity markers."),
+    ("off-topic or meta-discussion","A post that drifts from the stated topic to tangential discussion — politics in a sports thread, personal stories in a tech forum — using the Wikipedia topic as the nominal subject while the actual content wanders: forces topical ambiguity."),
+
+    # ── Financial & Market Domain ────────────────────────────────────────────
+    ("market commentary or analysis","Analyst-style prose about the Wikipedia topic framed as stock movements, sector trends, or economic indicators: forward-looking, numerical, cautious hedging."),
+    ("financial news brief",       "Short-form business-wire reporting about the Wikipedia topic: company earnings, M&A activity, regulatory actions — factual, present-tense, jargon-heavy."),
+    ("economic policy discussion", "Commentary on monetary or fiscal policy inspired by the Wikipedia topic: mixes economic terminology with opinion, interest-rate and trade framing, op-ed-adjacent register."),
+
+    # ── Tech vs Business Boundary ────────────────────────────────────────────
+    ("technology product news",    "News about a technology product, launch, or feature related to the Wikipedia topic: technology-focused even when involving a company — distinct from business or financial framing of the same entity."),
+    ("tech industry analysis",     "Analysis of technology trends, platform competition, or adoption curves related to the Wikipedia topic: straddles tech and business but leads with the technology angle, data-driven."),
 ]

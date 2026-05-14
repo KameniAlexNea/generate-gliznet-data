@@ -1,4 +1,4 @@
-nohup timeout 20h python main.py \
+nohup timeout 14h python main.py \
     --output_path data/wikipedia_synthetic.jsonl \
     --model gliznet-data \
     --api_base http://localhost:8000/v1 \
