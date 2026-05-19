@@ -5,11 +5,11 @@
 
 # (label, instruction passed to the model)
 TEXT_LENGTHS = [
-    ("very short",  "Each text must be exactly 1 sentence — dense and self-contained."),
-    ("short",       "Each text must be 1–2 sentences."),
-    ("medium",      "Each text must be 2–3 sentences."),
-    ("long",        "Each text must be 3–5 sentences forming a coherent, developed paragraph."),
-    ("very long",   "Each text must be 5–8 sentences: a fully developed paragraph with context, development, and a closing point."),
+    # ("very short",  "Each text must be exactly 1 sentence — dense and self-contained."),
+    # ("short",       "Each text must be 1–2 sentences."),
+    ("medium",      "Each text must be 2–3 substantial sentences (at least 40 words total). Each sentence should be detailed and information-rich, not short telegraphic fragments."),
+    ("long",        "Each text must be 3–5 sentences forming a coherent, developed paragraph (at least 70 words total). Use complex sentences with subordinate clauses, concrete details, and layered information."),
+    ("very long",   "Each text must be 5–8 sentences: a fully developed paragraph with context, development, and a closing point (at least 120 words total). Sentences should be rich, varied in structure, and densely informative."),
 ]
 
 # (label, instruction passed to the model)
@@ -33,7 +33,7 @@ TEXT_GENRES = [
     ("tabloid headline or lede",   "Sensational tabloid prose about the Wikipedia topic: punchy verbs, hyperbole, celebrity or scandal framing even for dry subjects — breathless register."),
     ("op-ed / opinion column",     "A strong personal argument about the Wikipedia topic in a newspaper opinion piece: direct, polemical, first-person authority."),
     ("sports commentary",          "Energetic commentary covering the Wikipedia topic as if it were a live or recent sporting event: competitive stakes, dramatic moments, statistics — any topic can be framed as a contest or championship."),
-    ("letter to the editor",       "A reader's letter submitted to a newspaper or magazine about the Wikipedia topic: opinionated, concise, addressed to the publication, appeals to civic or community concern — distinct from an op-ed in its brevity and reader-voice register."),
+    # ("letter to the editor",       "A reader's letter submitted to a newspaper or magazine about the Wikipedia topic: opinionated, concise, addressed to the publication, appeals to civic or community concern — distinct from an op-ed in its brevity and reader-voice register."),
 
     # ── Academic / Scientific ────────────────────────────────────────────────
     ("empirical paper finding",    "A single key result or finding as it would appear in a scientific paper about the Wikipedia topic: specific, data-grounded, past-tense, with implied methodology."),
@@ -103,7 +103,7 @@ TEXT_GENRES = [
     ("customer complaint",         "A frustrated but specific complaint about an experience with the Wikipedia topic treated as a service, product, or institution: first-person, grievance-driven, concrete incident."),
     ("listicle entry",             "One item from a numbered or bulleted web list about the Wikipedia topic: punchy, self-contained, slightly informal."),
     ("speech excerpt",             "A line from a formal speech or address about the Wikipedia topic: rhetorical, second-person appeal, elevated register, memorable phrasing."),
-    ("letter or email",            "An excerpt from a formal or semi-formal letter about the Wikipedia topic: addressed tone, clear purpose, specific context."),
+    # ("letter or email",            "An excerpt from a formal or semi-formal letter about the Wikipedia topic: addressed tone, clear purpose, specific context."),
     ("satirical piece",            "Dry or absurdist humor commenting on the Wikipedia topic: deadpan, ironic, mimics a serious register (official report, academic paper) while undercutting it."),
     ("obituary",                   "A respectful retrospective about the Wikipedia subject: if a person, summarises life and legacy; if a concept, institution, or era, marks its significance, rise, and end — past-tense, commemorative, specific milestones."),
     ("eulogy",                     "A spoken tribute about the Wikipedia subject delivered to an implied audience: celebratory of achievements, emotionally layered, past-tense — works for people, institutions, or ended eras."),
@@ -119,7 +119,7 @@ TEXT_GENRES = [
     ("therapy progress note",      "A clinician's session note in which the Wikipedia topic is the presenting concern or context: objective behavioral observations, affective assessment, treatment goals, impersonal third-person clinical register."),
     ("code comment or docstring",  "Inline developer documentation treating the Wikipedia topic as a software component: terse, imperative or descriptive, parameter- and return-value-focused, assumes reader can read code."),
     ("museum audio guide script",  "A timed spoken-word guide for a visitor standing before an exhibit related to the Wikipedia topic: second-person address, paced for a two-minute listening experience, sensory prompts directing attention, builds to a closing reflection — evocative but informative."),
-    ("personal recommendation letter", "A formal letter endorsing a person, organisation, or initiative related to the Wikipedia topic: first-person endorser voice, specific evidence of merit, formal salutation and close, testimonial register — distinct from a press release in its personal accountability."),
+    # ("personal recommendation letter", "A formal letter endorsing a person, organisation, or initiative related to the Wikipedia topic: first-person endorser voice, specific evidence of merit, formal salutation and close, testimonial register — distinct from a press release in its personal accountability."),
 
     # ── Scalar / Ordinal Genres ──────────────────────────────────────────────
     # These genres produce texts where labels naturally form ordered scales or
@@ -138,7 +138,7 @@ TEXT_GENRES = [
     ("commitment or conviction statement", "A statement of intent, belief, or allegiance related to the Wikipedia topic at a specific conviction level: from tentative openness through cautious support, firm commitment, passionate advocacy, to unconditional devotion — the strength of modal verbs, repetition, and rhetorical intensity must encode the level."),
 
     # ── Email Domain ─────────────────────────────────────────────────────────
-    ("email newsletter",           "A subscription newsletter excerpt about the Wikipedia topic: promotional but legitimate, opt-in language, unsubscribe footer, branded tone — the kind of regular email a reader has signed up for."),
+    # ("email newsletter",           "A subscription newsletter excerpt about the Wikipedia topic: promotional but legitimate, opt-in language, unsubscribe footer, branded tone — the kind of regular email a reader has signed up for."),
     ("spam or phishing email",     "An unsolicited commercial or scam email about the Wikipedia topic: urgent call to action, too-good-to-be-true offers, obfuscated links, impersonation — the reader should recognise the manipulative register."),
     ("corporate email thread",     "An internal work email exchange about the Wikipedia topic: logistics, scheduling, project updates, reply-chain conventions, CC-heavy — informal-professional register."),
     ("automated notification email","A system-generated email about the Wikipedia topic: order confirmations, password resets, account alerts, templated structure, minimal prose, transactional register."),

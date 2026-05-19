@@ -14,7 +14,8 @@ from openai import AsyncOpenAI, APIConnectionError, APIError, APITimeoutError
 from tqdm import tqdm
 
 from src.genres import TEXT_GENRES, TEXT_LENGTHS, LANGUAGE_LEVELS
-from src.prompt import SYSTEM_PROMPT
+from src.prompt import SYSTEM_PROMPT, FREE_LABEL_SYSTEM_PROMPT, get_candidate_labels
+import src.prompt as _prompt_module
 from src.config import Config
 
 logging.basicConfig(
@@ -26,6 +27,14 @@ logger = logging.getLogger(__name__)
 
 
 USER_TEMPLATE = (
+    "<genre>\n{genres_block}\n</genre>\n\n"
+    "<length>{length_label}: {length_instruction}</length>\n\n"
+    "<language_level>{level_label}: {level_instruction}</language_level>\n\n"
+    "<wikipedia_excerpt>\n{title}\n\n{text}\n</wikipedia_excerpt>\n\n"
+    "<candidate_labels>\n{candidate_labels}\n</candidate_labels>"
+)
+
+USER_TEMPLATE_FREE = (
     "<genre>\n{genres_block}\n</genre>\n\n"
     "<length>{length_label}: {length_instruction}</length>\n\n"
     "<language_level>{level_label}: {level_instruction}</language_level>\n\n"
@@ -44,17 +53,34 @@ def _build_messages(title: str, text: str, max_paragraphs: int = 5) -> tuple[lis
     else:
         index = random.choice(range(len(paragraphs) - max_paragraphs + 1))
         text = "\n\n".join(paragraphs[index : index + max_paragraphs])
-    user_content = USER_TEMPLATE.format(
-        genres_block=genres_block + "\n",
-        length_label=length_label,
-        length_instruction=length_instruction,
-        level_label=level_label,
-        level_instruction=level_instruction,
-        title=title,
-        text=text,
-    )
+
+    if _prompt_module.FREE_LABELS:
+        user_content = USER_TEMPLATE_FREE.format(
+            genres_block=genres_block + "\n",
+            length_label=length_label,
+            length_instruction=length_instruction,
+            level_label=level_label,
+            level_instruction=level_instruction,
+            title=title,
+            text=text,
+        )
+        system_prompt = FREE_LABEL_SYSTEM_PROMPT
+    else:
+        candidates = get_candidate_labels(text)
+        user_content = USER_TEMPLATE.format(
+            genres_block=genres_block + "\n",
+            length_label=length_label,
+            length_instruction=length_instruction,
+            level_label=level_label,
+            level_instruction=level_instruction,
+            title=title,
+            text=text,
+            candidate_labels=", ".join(candidates),
+        )
+        system_prompt = SYSTEM_PROMPT
+
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content[: Config.MAX_INPUT_TOKENS]},
     ]
     meta = {"genre": name, "language_level": level_label}
@@ -238,11 +264,24 @@ def parse_args() -> argparse.Namespace:
         default=50_000,
         help="Buffer size for streaming shuffle.",
     )
+    p.add_argument(
+        "--free-labels",
+        action="store_true",
+        default=False,
+        help="Use free label generation (model invents labels) instead of fixed taxonomy.",
+    )
     return p.parse_args()
 
 
 async def main() -> None:
     args = parse_args()
+
+    # Set label generation mode
+    _prompt_module.FREE_LABELS = args.free_labels
+    if args.free_labels:
+        logger.info("Mode: FREE label generation (model invents labels)")
+    else:
+        logger.info("Mode: FIXED label generation (labels from taxonomy)")
 
     output_path = Path(args.output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
